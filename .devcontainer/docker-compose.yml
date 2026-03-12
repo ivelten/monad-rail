@@ -1,0 +1,8 @@
+services:
+  app:
+    image: ivelten/haskell-devcontainer
+    # Keeps the container running
+    command: /bin/sh -c "while sleep 1000; do :; done"
+    volumes:
+      # Mount your workspace
+      - ..:/workspaces/haskell:cached
