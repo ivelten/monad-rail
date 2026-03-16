@@ -38,7 +38,7 @@ module Monad.Rail.Error
 where
 
 import qualified Control.Exception as E
-import Data.Aeson (ToJSON (..), object, (.=))
+import Data.Aeson (ToJSON (..), Value, object, (.=))
 import Data.List.NonEmpty (NonEmpty)
 import Data.Text (Text)
 
@@ -62,16 +62,29 @@ instance ToJSON ErrorSeverity where
 
 -- | Contains detailed information about an application error.
 --
--- This record type holds all the metadata about an error, including a human-readable message,
--- a machine-readable code, the severity level, and an optional associated exception.
--- This information is particularly useful for logging, monitoring, and error reporting systems.
+-- This record type holds all the metadata about an error, including both public
+-- and internal messages, a machine-readable code, severity level, an optional
+-- associated exception, optional context details, and optional request information.
 --
--- The record fields can be accessed directly or via the 'IsApplicationError' type class,
--- which provides a unified interface for retrieving error information.
+-- The public message is safe to expose to end users, while the internal message,
+-- severity, and request data are intended only for logging and administrative purposes.
 data ApplicationErrorInfo = ApplicationErrorInfo
-  { -- | A human-readable message describing what went wrong.
-    -- This message should be clear and helpful for understanding the error.
-    message :: Text,
+  { -- | A human-readable message for end users.
+    -- This message should be clear, helpful, and safe to display to clients.
+    -- It should not contain sensitive information like database details or
+    -- internal IP addresses.
+    --
+    -- Example: @\"Invalid email format\"@
+    publicMessage :: Text,
+    -- | An optional technical message for administrators and logs.
+    -- This message can contain sensitive infrastructure details, stack traces,
+    -- database information, and other diagnostic data.
+    --
+    -- This field is intentionally excluded from JSON serialization to prevent
+    -- accidental exposure of sensitive information in API responses.
+    --
+    -- Example: @Just \"Failed to connect to replica database at 192.168.1.5:5432\"@
+    internalMessage :: Maybe Text,
     -- | A machine-readable error code that categorizes the type of error.
     --
     -- Error codes are useful for:
@@ -84,23 +97,49 @@ data ApplicationErrorInfo = ApplicationErrorInfo
     code :: Text,
     -- | The severity level of the error, indicating how critical it is.
     -- See 'ErrorSeverity' for available levels.
+    --
+    -- This field is intentionally excluded from JSON serialization as it is
+    -- primarily used for logging and monitoring purposes.
     severity :: ErrorSeverity,
     -- | An optional runtime exception associated with the error, if any.
     --
     -- This field is useful for capturing the underlying exception that caused
     -- the error, such as a database connection timeout or file I\/O error.
     -- When serialized to JSON, the exception is converted to its string representation.
-    exception :: Maybe E.SomeException
+    exception :: Maybe E.SomeException,
+    -- | Optional context details associated with the error.
+    --
+    -- This field can hold any JSON-serializable data that provides additional
+    -- context about the error. For example:
+    --
+    -- * User ID that triggered the error
+    -- * Request ID for tracing
+    -- * Affected resource identifiers
+    -- * Custom business logic data
+    --
+    -- Using 'Value' from @aeson@ allows flexibility: you can store objects,
+    -- arrays, strings, or any JSON value. This field is exposed in API responses.
+    --
+    -- Example: @Just (object ["userId" .= (123 :: Int), "attemptCount" .= (5 :: Int)])@
+    details :: Maybe Value,
+    -- | Optional information about the request that caused this error.
+    --
+    -- This field is intentionally excluded from JSON serialization to prevent
+    -- accidental exposure of request details in API responses. It is intended
+    -- for logging, debugging, and administrative purposes only.
+    --
+    -- Example: @Just (object ["method" .= (\"POST\" :: Text), "path" .= (\"/api/users\" :: Text)])@
+    requestInfo :: Maybe Value
   }
   deriving (Show)
 
 instance ToJSON ApplicationErrorInfo where
   toJSON err =
     object
-      [ "message" .= message err,
+      [ "message" .= publicMessage err,
         "code" .= code err,
-        "severity" .= severity err,
-        "exception" .= fmap show (exception err)
+        "exception" .= fmap show (exception err),
+        "details" .= details err
       ]
 
 -- | A type class for converting custom error types into 'ApplicationErrorInfo'.

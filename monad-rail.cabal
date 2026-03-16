@@ -6,32 +6,30 @@ description:
   Monad.Rail is a Haskell library for Railway-Oriented Programming (ROP),
   a functional approach to error handling that makes error paths explicit
   and composable.
-  .
+
   The library provides:
-  .
+
   * 'RailT' - A monad transformer for building reliable applications
   * Type-safe error handling with support for error accumulation
   * Automatic JSON serialization of errors for logging and monitoring
   * The '<!>' operator for combining validations while collecting all errors
   * Integration with any error type implementing 'IsApplicationError'
-  .
+
   Railway-Oriented Programming separates success and failure paths,
   making it easy to handle both cases explicitly. The '<!>' operator
   is particularly useful for validation scenarios where you want to
   report all validation errors at once rather than stopping at the first failure.
-  .
+
   For more information and examples, see the documentation for "Monad.Rail".
 
 license: BSD-3-Clause
 license-file: LICENSE
 author: Ismael Carlos Velten
 maintainer: ismaelcarlosvelten@gmail.com
--- copyright:
 category: Control
 build-type: Simple
 extra-doc-files: CHANGELOG.md
 
--- extra-source-files:
 common warnings
   ghc-options: -Wall
 
@@ -42,8 +40,6 @@ library
     Monad.Rail.Error
     Monad.Rail.Types
 
-  -- other-modules:
-  -- other-extensions:
   build-depends:
     aeson ^>=2.2.3.0,
     base ^>=4.17 || ^>=4.18 || ^>=4.19 || ^>=4.20,
@@ -56,8 +52,6 @@ library
 test-suite monad-rail-test
   import: warnings
   default-language: Haskell2010
-  -- other-modules:
-  -- other-extensions:
   type: exitcode-stdio-1.0
   hs-source-dirs: test
   main-is: Main.hs
