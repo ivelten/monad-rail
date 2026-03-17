@@ -35,3 +35,6 @@ cabal.project.rescan
 Thumbs.db
 *.tmp
 *.bak
+
+# Claude
+.claude/
