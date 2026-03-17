@@ -63,8 +63,8 @@
 -- >>> data UserError = NameEmpty
 -- >>> data DatabaseError = ConnectionFailed
 -- >>>
--- >>> instance IsApplicationError UserError where { ... }
--- >>> instance IsApplicationError DatabaseError where { ... }
+-- >>> instance HasErrorInfo UserError where { ... }
+-- >>> instance HasErrorInfo DatabaseError where { ... }
 -- >>>
 -- >>> myRailway :: Rail ()
 -- >>> myRailway = do

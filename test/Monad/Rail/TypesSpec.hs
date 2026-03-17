@@ -16,9 +16,9 @@ import Test.Hspec
 data TestError = ErrA | ErrB | ErrC
   deriving (Show, Eq)
 
-instance IsApplicationError TestError where
-  getErrorInfo ErrA =
-    ApplicationErrorInfo
+instance HasErrorInfo TestError where
+  errorInfo ErrA =
+    ErrorInfo
       { publicMessage = "Error A",
         internalMessage = Nothing,
         code = "ERR_A",
@@ -27,8 +27,8 @@ instance IsApplicationError TestError where
         details = Nothing,
         requestInfo = Nothing
       }
-  getErrorInfo ErrB =
-    ApplicationErrorInfo
+  errorInfo ErrB =
+    ErrorInfo
       { publicMessage = "Error B",
         internalMessage = Nothing,
         code = "ERR_B",
@@ -37,8 +37,8 @@ instance IsApplicationError TestError where
         details = Nothing,
         requestInfo = Nothing
       }
-  getErrorInfo ErrC =
-    ApplicationErrorInfo
+  errorInfo ErrC =
+    ErrorInfo
       { publicMessage = "Error C",
         internalMessage = Nothing,
         code = "ERR_C",
@@ -88,7 +88,7 @@ spec = do
       case result of
         Right _ -> expectationFailure "expected Left, got Right"
         Left err ->
-          let info = getErrorInfo (NE.head (getAppErrors err))
+          let info = errorInfo (NE.head (getAppErrors err))
            in code info `shouldBe` "ERR_A"
 
     it "short-circuits: code after throwError is not executed" $ do
@@ -114,7 +114,7 @@ spec = do
           Right _ -> expectationFailure "expected Left, got Right"
           Left err -> do
             length (getAppErrors err) `shouldBe` 1
-            (code . getErrorInfo . NE.head . getAppErrors) err `shouldBe` "ERR_A"
+            (code . errorInfo . NE.head . getAppErrors) err `shouldBe` "ERR_A"
 
     describe "Right <!> Left" $ do
       it "fails with the second error only" $ do
@@ -123,7 +123,7 @@ spec = do
           Right _ -> expectationFailure "expected Left, got Right"
           Left err -> do
             length (getAppErrors err) `shouldBe` 1
-            (code . getErrorInfo . NE.head . getAppErrors) err `shouldBe` "ERR_B"
+            (code . errorInfo . NE.head . getAppErrors) err `shouldBe` "ERR_B"
 
     describe "Left <!> Left" $ do
       it "accumulates errors from both sides" $ do
@@ -137,7 +137,7 @@ spec = do
         case result of
           Right _ -> expectationFailure "expected Left, got Right"
           Left err ->
-            let codes = map (code . getErrorInfo) (NE.toList (getAppErrors err))
+            let codes = map (code . errorInfo) (NE.toList (getAppErrors err))
              in codes `shouldBe` ["ERR_A", "ERR_B"]
 
     describe "chaining three validations" $ do

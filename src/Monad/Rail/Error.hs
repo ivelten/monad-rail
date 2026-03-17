@@ -5,18 +5,18 @@
 -- | This module provides the core error handling types and type classes for the Railway-Oriented monad.
 --
 -- The module defines a hierarchy of error types, from specific 'ErrorSeverity' levels to the generic
--- 'ApplicationError' wrapper that can hold any error type implementing 'IsApplicationError'.
+-- 'ApplicationError' wrapper that can hold any error type implementing 'HasErrorInfo'.
 -- These types work together to provide a flexible, type-safe error handling system that supports
 -- error accumulation and serialization to JSON.
 --
 -- == Quick Start
 --
--- 1. Define your error type and implement 'IsApplicationError':
+-- 1. Define your error type and implement 'HasErrorInfo':
 --
 -- >>> data UserError = NameEmpty | EmailInvalid
--- >>> instance IsApplicationError UserError where
--- >>>   getErrorInfo NameEmpty = ApplicationErrorInfo "Name cannot be empty" "USER_NAME_EMPTY" Error Nothing
--- >>>   getErrorInfo EmailInvalid = ApplicationErrorInfo "Email is invalid" "USER_EMAIL_INVALID" Error Nothing
+-- >>> instance HasErrorInfo UserError where
+-- >>>   errorInfo NameEmpty = ErrorInfo "Name cannot be empty" "USER_NAME_EMPTY" Error Nothing
+-- >>>   errorInfo EmailInvalid = ErrorInfo "Email is invalid" "USER_EMAIL_INVALID" Error Nothing
 --
 -- 2. Wrap it in 'ApplicationError' to use in your Railway:
 --
@@ -30,8 +30,8 @@
 -- >>>   Left errors -> print errors  -- Automatically serializes to JSON
 module Monad.Rail.Error
   ( ErrorSeverity (..),
-    ApplicationErrorInfo (..),
-    IsApplicationError (..),
+    ErrorInfo (..),
+    HasErrorInfo (..),
     ApplicationError (..),
     RailError (..),
   )
@@ -68,7 +68,7 @@ instance ToJSON ErrorSeverity where
 --
 -- The public message is safe to expose to end users, while the internal message,
 -- severity, and request data are intended only for logging and administrative purposes.
-data ApplicationErrorInfo = ApplicationErrorInfo
+data ErrorInfo = ErrorInfo
   { -- | A human-readable message for end users.
     -- This message should be clear, helpful, and safe to display to clients.
     -- It should not contain sensitive information like database details or
@@ -133,7 +133,7 @@ data ApplicationErrorInfo = ApplicationErrorInfo
   }
   deriving (Show)
 
-instance ToJSON ApplicationErrorInfo where
+instance ToJSON ErrorInfo where
   toJSON err =
     object
       [ "message" .= publicMessage err,
@@ -142,7 +142,7 @@ instance ToJSON ApplicationErrorInfo where
         "details" .= details err
       ]
 
--- | A type class for converting custom error types into 'ApplicationErrorInfo'.
+-- | A type class for converting custom error types into 'ErrorInfo'.
 --
 -- Implement this type class for your custom error types to integrate them with the
 -- Railway-Oriented monad. This allows your errors to be automatically converted to
@@ -152,23 +152,23 @@ instance ToJSON ApplicationErrorInfo where
 --
 -- >>> data UserError = NameEmpty | EmailInvalid
 -- >>>
--- >>> instance IsApplicationError UserError where
--- >>>   getErrorInfo NameEmpty =
--- >>>     ApplicationErrorInfo "Name cannot be empty" "USER_NAME_EMPTY" Error Nothing
--- >>>   getErrorInfo EmailInvalid =
--- >>>     ApplicationErrorInfo "Email format is invalid" "USER_EMAIL_INVALID" Error Nothing
-class IsApplicationError e where
-  -- | Converts the error into detailed 'ApplicationErrorInfo'.
+-- >>> instance HasErrorInfo UserError where
+-- >>>   errorInfo NameEmpty =
+-- >>>     ErrorInfo "Name cannot be empty" "USER_NAME_EMPTY" Error Nothing
+-- >>>   errorInfo EmailInvalid =
+-- >>>     ErrorInfo "Email format is invalid" "USER_EMAIL_INVALID" Error Nothing
+class HasErrorInfo e where
+  -- | Converts the error into detailed 'ErrorInfo'.
   --
   -- Implement this method to define how your custom error type is converted
   -- to the standard error information format.
-  getErrorInfo :: e -> ApplicationErrorInfo
+  errorInfo :: e -> ErrorInfo
 
--- | A wrapper type that can hold any application error implementing 'IsApplicationError'.
+-- | A wrapper type that can hold any application error implementing 'HasErrorInfo'.
 --
 -- This existential type allows you to combine errors of different types in the same
 -- Railway computation. It uses existential quantification to hide the concrete error type
--- while preserving the ability to extract error information via the 'IsApplicationError'
+-- while preserving the ability to extract error information via the 'HasErrorInfo'
 -- interface.
 --
 -- This is particularly useful when you have multiple error sources (e.g., validation errors,
@@ -179,8 +179,8 @@ class IsApplicationError e where
 -- >>> data UserError = NameEmpty
 -- >>> data DatabaseError = ConnectionFailed
 -- >>>
--- >>> instance IsApplicationError UserError where { ... }
--- >>> instance IsApplicationError DatabaseError where { ... }
+-- >>> instance HasErrorInfo UserError where { ... }
+-- >>> instance HasErrorInfo DatabaseError where { ... }
 -- >>>
 -- >>> validate :: Rail ()
 -- >>> validate = do
@@ -188,17 +188,17 @@ class IsApplicationError e where
 -- >>>   throwError (ApplicationError ConnectionFailed)  -- Database error
 data ApplicationError
   = forall e.
-    (IsApplicationError e, Show e) =>
+    (HasErrorInfo e, Show e) =>
     ApplicationError e
 
 instance ToJSON ApplicationError where
-  toJSON (ApplicationError e) = toJSON (getErrorInfo e)
+  toJSON (ApplicationError e) = toJSON (errorInfo e)
 
 instance Show ApplicationError where
   show (ApplicationError e) = show e
 
-instance IsApplicationError ApplicationError where
-  getErrorInfo (ApplicationError e) = getErrorInfo e
+instance HasErrorInfo ApplicationError where
+  errorInfo (ApplicationError e) = errorInfo e
 
 -- | Represents a collection of one or more application errors.
 --

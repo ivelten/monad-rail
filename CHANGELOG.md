@@ -7,6 +7,6 @@
 * `Rail` type alias for `RailT RailError IO`.
 * `throwError` for single-error failures.
 * `<!>` operator for parallel validation with error accumulation.
-* `IsApplicationError` typeclass for custom error types.
-* `ApplicationErrorInfo` with public/internal message separation and JSON serialization.
+* `HasErrorInfo` typeclass for custom error types.
+* `ErrorInfo` with public/internal message separation and JSON serialization.
 * `ErrorSeverity` with `Error` and `Critical` levels.

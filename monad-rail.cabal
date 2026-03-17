@@ -13,7 +13,7 @@ description:
   * Type-safe error handling with support for error accumulation
   * Automatic JSON serialization of errors for logging and monitoring
   * The '<!>' operator for combining validations while collecting all errors
-  * Integration with any error type implementing 'IsApplicationError'
+  * Integration with any error type implementing 'HasErrorInfo'
 
   Railway-Oriented Programming separates success and failure paths,
   making it easy to handle both cases explicitly. The '<!>' operator
@@ -46,6 +46,7 @@ library
   import: warnings
   exposed-modules:
     Monad.Rail
+  other-modules:
     Monad.Rail.Error
     Monad.Rail.Types
 

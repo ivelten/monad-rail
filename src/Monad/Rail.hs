@@ -25,8 +25,8 @@
 --
 -- >>> data UserError = NameEmpty | EmailInvalid
 -- >>>
--- >>> instance IsApplicationError UserError where
--- >>>   errorInfo NameEmpty = ApplicationErrorInfo
+-- >>> instance HasErrorInfo UserError where
+-- >>>   errorInfo NameEmpty = ErrorInfo
 -- >>>     { publicMessage = "Name cannot be empty"
 -- >>>     , internalMessage = Nothing
 -- >>>     , code = "USER_NAME_EMPTY"
@@ -67,7 +67,7 @@
 -- * 'Rail' - The monad for your computations
 -- * 'RailError' - Contains accumulated errors
 -- * 'ApplicationError' - Wrapper for any error type
--- * 'IsApplicationError' - Typeclass for custom errors
+-- * 'HasErrorInfo' - Typeclass for custom errors
 -- * '<!>' - Error accumulation operator
 --
 -- == Logging and Monitoring
@@ -106,8 +106,8 @@ module Monad.Rail
 
     -- | Error handling types and typeclasses
     ErrorSeverity (..),
-    ApplicationErrorInfo (..),
-    IsApplicationError (..),
+    ErrorInfo (..),
+    HasErrorInfo (..),
     ApplicationError (..),
   )
 where

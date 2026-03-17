@@ -17,9 +17,9 @@ import Test.QuickCheck
 data TestError = TestErrorA | TestErrorB
   deriving (Show, Eq)
 
-instance IsApplicationError TestError where
-  getErrorInfo TestErrorA =
-    ApplicationErrorInfo
+instance HasErrorInfo TestError where
+  errorInfo TestErrorA =
+    ErrorInfo
       { publicMessage = "Error A occurred",
         internalMessage = Just "Internal details for A",
         code = "TEST_ERROR_A",
@@ -28,8 +28,8 @@ instance IsApplicationError TestError where
         details = Nothing,
         requestInfo = Nothing
       }
-  getErrorInfo TestErrorB =
-    ApplicationErrorInfo
+  errorInfo TestErrorB =
+    ErrorInfo
       { publicMessage = "Error B occurred",
         internalMessage = Nothing,
         code = "TEST_ERROR_B",
@@ -113,9 +113,9 @@ spec = do
       it "serializes Critical as JSON string \"Critical\"" $
         toJSON Critical `shouldBe` String "Critical"
 
-  describe "ApplicationErrorInfo" $ do
+  describe "ErrorInfo" $ do
     let errInfo =
-          ApplicationErrorInfo
+          ErrorInfo
             { publicMessage = "Something went wrong",
               internalMessage = Just "DB connection failed at 10.0.0.1",
               code = "GENERIC_ERROR",
@@ -150,27 +150,27 @@ spec = do
     it "Show delegates to the wrapped error's Show instance" $
       show (mkAppError TestErrorA) `shouldBe` "TestErrorA"
 
-    it "getErrorInfo extracts correct code" $ do
-      let info = getErrorInfo (mkAppError TestErrorA)
+    it "errorInfo extracts correct code" $ do
+      let info = errorInfo (mkAppError TestErrorA)
       code info `shouldBe` "TEST_ERROR_A"
 
-    it "getErrorInfo extracts correct publicMessage" $ do
-      let info = getErrorInfo (mkAppError TestErrorA)
+    it "errorInfo extracts correct publicMessage" $ do
+      let info = errorInfo (mkAppError TestErrorA)
       publicMessage info `shouldBe` "Error A occurred"
 
-    it "getErrorInfo extracts correct severity" $ do
-      let info = getErrorInfo (mkAppError TestErrorA)
+    it "errorInfo extracts correct severity" $ do
+      let info = errorInfo (mkAppError TestErrorA)
       severity info `shouldBe` Error
 
     it "wraps different error types, each with their own info" $ do
-      let infoA = getErrorInfo (mkAppError TestErrorA)
-          infoB = getErrorInfo (mkAppError TestErrorB)
+      let infoA = errorInfo (mkAppError TestErrorA)
+          infoB = errorInfo (mkAppError TestErrorB)
       code infoA `shouldBe` "TEST_ERROR_A"
       code infoB `shouldBe` "TEST_ERROR_B"
 
     describe "ToJSON" $ do
-      it "serializes via getErrorInfo" $
-        toJSON (mkAppError TestErrorA) `shouldBe` toJSON (getErrorInfo TestErrorA)
+      it "serializes via errorInfo" $
+        toJSON (mkAppError TestErrorA) `shouldBe` toJSON (errorInfo TestErrorA)
 
   describe "RailError" $ do
     describe "Semigroup" $ do

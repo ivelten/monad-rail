@@ -29,9 +29,9 @@ data UserError
   | AgeTooLow
   deriving (Show)
 
-instance IsApplicationError UserError where
-  getErrorInfo NameEmpty =
-    ApplicationErrorInfo
+instance HasErrorInfo UserError where
+  errorInfo NameEmpty =
+    ErrorInfo
       { publicMessage   = "Name cannot be empty"
       , internalMessage = Nothing
       , code            = "USER_NAME_EMPTY"
@@ -40,8 +40,8 @@ instance IsApplicationError UserError where
       , details         = Nothing
       , requestInfo     = Nothing
       }
-  getErrorInfo EmailInvalid =
-    ApplicationErrorInfo
+  errorInfo EmailInvalid =
+    ErrorInfo
       { publicMessage   = "Invalid email format"
       , internalMessage = Nothing
       , code            = "USER_EMAIL_INVALID"
@@ -50,8 +50,8 @@ instance IsApplicationError UserError where
       , details         = Nothing
       , requestInfo     = Nothing
       }
-  getErrorInfo AgeTooLow =
-    ApplicationErrorInfo
+  errorInfo AgeTooLow =
+    ErrorInfo
       { publicMessage   = "Must be at least 18 years old"
       , internalMessage = Nothing
       , code            = "USER_AGE_TOO_LOW"
@@ -159,16 +159,16 @@ Executes the computation and returns `Either RailError a`:
 runRail :: Rail a -> IO (Either RailError a)
 ```
 
-### `IsApplicationError`
+### `HasErrorInfo`
 
 Typeclass connecting your domain error types to the standard error format:
 
 ```haskell
-class IsApplicationError e where
-  getErrorInfo :: e -> ApplicationErrorInfo
+class HasErrorInfo e where
+  errorInfo :: e -> ErrorInfo
 ```
 
-### `ApplicationErrorInfo`
+### `ErrorInfo`
 
 Holds all metadata for an error. Fields are split by visibility:
 
@@ -199,8 +199,8 @@ Use `Critical` for errors that need immediate attention (e.g., data corruption, 
 ```haskell
 data DbError = ConnectionFailed deriving (Show)
 
-instance IsApplicationError DbError where
-  getErrorInfo ConnectionFailed = ApplicationErrorInfo
+instance HasErrorInfo DbError where
+  errorInfo ConnectionFailed = ErrorInfo
     { publicMessage   = "Service temporarily unavailable"
     , internalMessage = Just "Postgres replica at 10.0.0.5:5432 unreachable"
     , code            = "DB_CONNECTION_FAILED"
