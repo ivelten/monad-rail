@@ -64,10 +64,10 @@ instance ToJSON ErrorSeverity where
 --
 -- This record type holds all the metadata about an error, including both public
 -- and internal messages, a machine-readable code, severity level, an optional
--- associated exception, optional context details, and optional request information.
+-- associated exception, and optional context details.
 --
 -- The public message is safe to expose to end users, while the internal message,
--- severity, and request data are intended only for logging and administrative purposes.
+-- severity, and exception are intended only for logging and administrative purposes.
 data ErrorInfo = ErrorInfo
   { -- | A human-readable message for end users.
     -- This message should be clear, helpful, and safe to display to clients.

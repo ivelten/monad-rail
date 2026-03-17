@@ -206,7 +206,6 @@ instance HasErrorInfo DbError where
     , severity        = Critical
     , exception       = Nothing
     , details         = Nothing
-    , requestInfo     = Nothing
     }
 
 pipeline :: Rail ()
