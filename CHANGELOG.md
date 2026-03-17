@@ -10,3 +10,5 @@
 * `HasErrorInfo` typeclass for custom error types.
 * `ErrorInfo` with public/internal message separation and JSON serialization.
 * `ErrorSeverity` with `Error` and `Critical` levels.
+* `CaughtException` newtype for wrapping runtime exceptions as Railway errors.
+* `tryRail` for lifting IO actions that may throw into the Railway, converting any exception to a `CaughtException` error with `Critical` severity.
