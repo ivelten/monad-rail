@@ -106,9 +106,7 @@ module Monad.Rail
     -- * Operators
     (<!>),
 
-    -- * Re-exports from Error module
-
-    -- | Error handling types and typeclasses
+    -- * Error types
     ErrorSeverity (..),
     PublicErrorInfo (..),
     InternalErrorInfo (..),
