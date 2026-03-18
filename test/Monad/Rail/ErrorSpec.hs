@@ -148,16 +148,6 @@ spec = do
         encoded `shouldSatisfy` notContains "severity"
       it "does NOT include 'exception'" $
         encoded `shouldSatisfy` notContains "exception"
-      it "does NOT include 'requestInfo'" $
-        encoded `shouldSatisfy` notContains "requestInfo"
-      it "does NOT include 'component'" $
-        encoded `shouldSatisfy` notContains "component"
-      it "does NOT include 'userId'" $
-        encoded `shouldSatisfy` notContains "userId"
-      it "does NOT include 'entrypoint'" $
-        encoded `shouldSatisfy` notContains "entrypoint"
-      it "does NOT include 'componentVersion'" $
-        encoded `shouldSatisfy` notContains "componentVersion"
       it "does NOT include 'callStack'" $
         encoded `shouldSatisfy` notContains "callStack"
 
@@ -167,11 +157,6 @@ spec = do
             { internalMessage = Nothing,
               severity = Error,
               exception = Nothing,
-              requestInfo = Nothing,
-              component = Nothing,
-              userId = Nothing,
-              entrypoint = Nothing,
-              componentVersion = Nothing,
               callStack = Nothing
             }
 
@@ -184,16 +169,6 @@ spec = do
         encode (toJSON base) `shouldSatisfy` notContains "message"
       it "omits 'exception' when Nothing" $
         encode (toJSON base) `shouldSatisfy` notContains "exception"
-      it "omits 'requestInfo' when Nothing" $
-        encode (toJSON base) `shouldSatisfy` notContains "requestInfo"
-      it "omits 'component' when Nothing" $
-        encode (toJSON base) `shouldSatisfy` notContains "component"
-      it "omits 'userId' when Nothing" $
-        encode (toJSON base) `shouldSatisfy` notContains "userId"
-      it "omits 'entrypoint' when Nothing" $
-        encode (toJSON base) `shouldSatisfy` notContains "entrypoint"
-      it "omits 'componentVersion' when Nothing" $
-        encode (toJSON base) `shouldSatisfy` notContains "componentVersion"
       it "omits 'callStack' when Nothing" $
         encode (toJSON base) `shouldSatisfy` notContains "callStack"
 
@@ -201,30 +176,6 @@ spec = do
       it "includes 'message' when Just" $
         encode (toJSON base {internalMessage = Just "debug info"})
           `shouldSatisfy` contains "\"message\""
-      it "includes 'component' when Just" $
-        encode (toJSON base {component = Just "auth"})
-          `shouldSatisfy` contains "\"component\""
-      it "includes the component value" $
-        encode (toJSON base {component = Just "auth"})
-          `shouldSatisfy` contains "auth"
-      it "includes 'userId' when Just" $
-        encode (toJSON base {userId = Just "usr_abc123"})
-          `shouldSatisfy` contains "\"userId\""
-      it "includes the userId value" $
-        encode (toJSON base {userId = Just "usr_abc123"})
-          `shouldSatisfy` contains "usr_abc123"
-      it "includes 'entrypoint' when Just" $
-        encode (toJSON base {entrypoint = Just "POST /api/v1/users"})
-          `shouldSatisfy` contains "\"entrypoint\""
-      it "includes the entrypoint value" $
-        encode (toJSON base {entrypoint = Just "POST /api/v1/users"})
-          `shouldSatisfy` contains "POST /api/v1/users"
-      it "includes 'componentVersion' when Just" $
-        encode (toJSON base {componentVersion = Just "1.4.2"})
-          `shouldSatisfy` contains "\"componentVersion\""
-      it "includes the componentVersion value" $
-        encode (toJSON base {componentVersion = Just "1.4.2"})
-          `shouldSatisfy` contains "1.4.2"
       it "includes 'exception' as a string when Just" $ do
         ex <- Ex.try (Ex.evaluate (error "boom")) :: IO (Either Ex.SomeException ())
         case ex of
@@ -232,91 +183,10 @@ spec = do
             encode (toJSON base {exception = Just e})
               `shouldSatisfy` contains "\"exception\""
           Right _ -> expectationFailure "expected exception"
-      it "includes 'requestInfo' when Just" $ do
-        let ri = HTTPRequest $ HTTPRequestInfo {requestId = Just "req_1", requestMethod = Nothing, requestIp = Nothing, requestLength = Nothing, requestHeaders = [], requestBody = Nothing}
-        encode (toJSON base {requestInfo = Just ri})
-          `shouldSatisfy` contains "\"requestInfo\""
       it "includes 'callStack' as a string when Just" $ do
         let internal = internalErrorInfo (mkSomeError TestErrorA)
             withCs = internal {callStack = Just GHC.callStack}
         encode (toJSON withCs) `shouldSatisfy` contains "\"callStack\""
-
-  describe "RequestContent" $ do
-    describe "ToJSON — JsonBody" $ do
-      it "serializes with type 'json'" $
-        encode (toJSON (JsonBody (object ["x" .= (1 :: Int)])))
-          `shouldSatisfy` contains "\"json\""
-      it "serializes with a 'body' field" $
-        encode (toJSON (JsonBody (object ["x" .= (1 :: Int)])))
-          `shouldSatisfy` contains "\"body\""
-      it "preserves the JSON structure in body" $
-        encode (toJSON (JsonBody (object ["x" .= (1 :: Int)])))
-          `shouldSatisfy` contains "\"x\""
-
-    describe "ToJSON — TextBody" $ do
-      it "serializes with type 'text'" $
-        encode (toJSON (TextBody "hello"))
-          `shouldSatisfy` contains "\"text\""
-      it "serializes with a 'body' field" $
-        encode (toJSON (TextBody "hello"))
-          `shouldSatisfy` contains "\"body\""
-      it "preserves the text value in body" $
-        encode (toJSON (TextBody "hello"))
-          `shouldSatisfy` contains "hello"
-
-  describe "RequestInfo" $ do
-    let emptyHi = HTTPRequestInfo {requestId = Nothing, requestMethod = Nothing, requestIp = Nothing, requestLength = Nothing, requestHeaders = [], requestBody = Nothing}
-        emptyRi = HTTPRequest emptyHi
-
-    describe "ToJSON — null/empty fields are omitted" $ do
-      it "omits 'requestId' when Nothing" $
-        encode (toJSON emptyRi) `shouldSatisfy` notContains "requestId"
-      it "omits 'method' when Nothing" $
-        encode (toJSON emptyRi) `shouldSatisfy` notContains "method"
-      it "omits 'ip' when Nothing" $
-        encode (toJSON emptyRi) `shouldSatisfy` notContains "ip"
-      it "omits 'length' when Nothing" $
-        encode (toJSON emptyRi) `shouldSatisfy` notContains "length"
-      it "omits 'headers' when list is empty" $
-        encode (toJSON emptyRi) `shouldSatisfy` notContains "headers"
-      it "omits 'body' when Nothing" $
-        encode (toJSON emptyRi) `shouldSatisfy` notContains "body"
-
-    describe "ToJSON — non-empty fields are included" $ do
-      it "includes 'requestId' when Just" $
-        encode (toJSON (HTTPRequest emptyHi {requestId = Just "req_abc"}))
-          `shouldSatisfy` contains "\"requestId\""
-      it "includes the requestId value" $
-        encode (toJSON (HTTPRequest emptyHi {requestId = Just "req_abc"}))
-          `shouldSatisfy` contains "req_abc"
-      it "includes 'method' when Just" $
-        encode (toJSON (HTTPRequest emptyHi {requestMethod = Just "POST"}))
-          `shouldSatisfy` contains "\"method\""
-      it "includes the method value" $
-        encode (toJSON (HTTPRequest emptyHi {requestMethod = Just "POST"}))
-          `shouldSatisfy` contains "POST"
-      it "includes 'ip' when Just" $
-        encode (toJSON (HTTPRequest emptyHi {requestIp = Just "203.0.113.42"}))
-          `shouldSatisfy` contains "\"ip\""
-      it "includes the ip value" $
-        encode (toJSON (HTTPRequest emptyHi {requestIp = Just "203.0.113.42"}))
-          `shouldSatisfy` contains "203.0.113.42"
-      it "includes 'length' when Just" $
-        encode (toJSON (HTTPRequest emptyHi {requestLength = Just 1024}))
-          `shouldSatisfy` contains "\"length\""
-      it "includes the length value" $
-        encode (toJSON (HTTPRequest emptyHi {requestLength = Just 1024}))
-          `shouldSatisfy` contains "1024"
-      it "includes 'headers' when non-empty" $
-        encode (toJSON (HTTPRequest emptyHi {requestHeaders = [("Content-Type", "application/json")]}))
-          `shouldSatisfy` contains "\"headers\""
-      it "includes header name and value" $ do
-        let encoded = encode (toJSON (HTTPRequest emptyHi {requestHeaders = [("Content-Type", "application/json")]}))
-        encoded `shouldSatisfy` contains "Content-Type"
-        encoded `shouldSatisfy` contains "application/json"
-      it "includes 'body' when Just" $
-        encode (toJSON (HTTPRequest emptyHi {requestBody = Just (TextBody "data")}))
-          `shouldSatisfy` contains "\"body\""
 
   describe "HasErrorInfo simple implementation" $ do
     it "errorPublicMessage returns the configured message for each constructor" $ do
@@ -345,11 +215,6 @@ spec = do
       let internal = internalErrorInfo NameEmpty
       internalMessage internal `shouldSatisfy` isNothing
       exception internal       `shouldSatisfy` isNothing
-      requestInfo internal     `shouldSatisfy` isNothing
-      component internal       `shouldSatisfy` isNothing
-      userId internal          `shouldSatisfy` isNothing
-      entrypoint internal      `shouldSatisfy` isNothing
-      componentVersion internal `shouldSatisfy` isNothing
       callStack internal       `shouldSatisfy` isNothing
 
   describe "UnhandledException" $ do

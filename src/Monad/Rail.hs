@@ -84,10 +84,9 @@
 --   Assembled via 'publicErrorInfo'; serialized to JSON in API responses.
 --   Null fields are omitted.
 -- * 'InternalErrorInfo' - Sensitive diagnostics: severity, internal message,
---   exception, request info, component, user ID, entrypoint, component version,
---   and call stack. Assembled via 'internalErrorInfo'; implements 'ToJSON' for
---   structured log output but is never included in public API responses.
---   Null fields are omitted.
+--   exception, and call stack. Assembled via 'internalErrorInfo'; implements
+--   'ToJSON' for structured log output but is never included in public API
+--   responses. Null fields are omitted.
 --
 -- The 'Failure' type implements 'ToJSON', so errors serialize automatically:
 --
@@ -122,9 +121,6 @@ module Monad.Rail
     -- * Error types
     ErrorSeverity (..),
     PublicErrorInfo (..),
-    RequestContent (..),
-    RequestInfo (..),
-    HTTPRequestInfo (..),
     InternalErrorInfo (..),
     HasErrorInfo (..),
     publicErrorInfo,

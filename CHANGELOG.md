@@ -11,11 +11,11 @@
   * `errorCode :: e -> Text` — defaults to the constructor name via `Data.toConstr` (requires `Data`).
   * `errorDetails :: e -> Maybe Value` — defaults to `Nothing`.
   * `errorSeverity :: e -> ErrorSeverity` — defaults to `Error`.
-  * `errorInternalMessage`, `errorException`, `errorRequestInfo`, `errorComponent`, `errorUserId`, `errorEntrypoint`, `errorComponentVersion`, `errorCallStack` — all default to `Nothing`.
+  * `errorInternalMessage`, `errorException`, `errorCallStack` — all default to `Nothing`.
 * `publicErrorInfo :: HasErrorInfo e => e -> PublicErrorInfo` — assembles the user-facing error record from an instance.
 * `internalErrorInfo :: HasErrorInfo e => e -> InternalErrorInfo` — assembles the internal diagnostic record from an instance.
 * `PublicErrorInfo` with fields `publicMessage`, `code`, and `details`. Serializes to JSON as `message`, `code`, and `details`. Null fields are omitted from JSON output.
-* `InternalErrorInfo` with fields `internalMessage`, `severity`, `exception`, `requestInfo`, `component`, `userId`, `entrypoint`, `componentVersion`, and `callStack`. Implements `ToJSON` for structured log output; null fields are omitted. Never included in public API responses.
+* `InternalErrorInfo` with fields `internalMessage`, `severity`, `exception`, and `callStack`. Implements `ToJSON` for structured log output; null fields are omitted. Never included in public API responses.
 * `ErrorSeverity` with `Error` and `Critical` levels.
 * `UnhandledException` data type for wrapping runtime exceptions as Railway errors, with fields `unhandledCode`, `unhandledException`, `unhandledCallStack`, and `unhandledMessage`. `unhandledCode` is `Maybe Text` and defaults to `"UnhandledException"` when `Nothing`.
 * `tryRail` (with `HasCallStack`) for lifting IO actions that may throw into the Railway, converting any exception to an `UnhandledException` error with `Critical` severity and an automatic call stack.

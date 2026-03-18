@@ -301,18 +301,13 @@ Typeclass connecting your domain error types to the standard error format. Only 
 
 ```haskell
 class HasErrorInfo e where
-  errorPublicMessage    :: e -> Text                -- Required
-  errorCode             :: e -> Text                -- Default: constructor name via Data
-  errorDetails          :: e -> Maybe Value         -- Default: Nothing
-  errorSeverity         :: e -> ErrorSeverity       -- Default: Error
-  errorInternalMessage  :: e -> Maybe Text          -- Default: Nothing
-  errorException        :: e -> Maybe SomeException -- Default: Nothing
-  errorRequestInfo      :: e -> Maybe RequestInfo   -- Default: Nothing
-  errorComponent        :: e -> Maybe Text          -- Default: Nothing
-  errorUserId           :: e -> Maybe Text          -- Default: Nothing
-  errorEntrypoint       :: e -> Maybe Text          -- Default: Nothing
-  errorComponentVersion :: e -> Maybe Text          -- Default: Nothing
-  errorCallStack        :: e -> Maybe CallStack     -- Default: Nothing
+  errorPublicMessage   :: e -> Text                -- Required
+  errorCode            :: e -> Text                -- Default: constructor name via Data
+  errorDetails         :: e -> Maybe Value         -- Default: Nothing
+  errorSeverity        :: e -> ErrorSeverity       -- Default: Error
+  errorInternalMessage :: e -> Maybe Text          -- Default: Nothing
+  errorException       :: e -> Maybe SomeException -- Default: Nothing
+  errorCallStack       :: e -> Maybe CallStack     -- Default: Nothing
 ```
 
 Use `publicErrorInfo` and `internalErrorInfo` to assemble the corresponding records from any instance:
@@ -379,36 +374,7 @@ Error data is split into two records by visibility. Use the `publicErrorInfo` an
 | `severity` | `severity` | `errorSeverity` |
 | `message` | `internalMessage` | `errorInternalMessage` |
 | `exception` | `exception` | `errorException` |
-| `requestInfo` | `requestInfo` | `errorRequestInfo` |
-| `component` | `component` | `errorComponent` |
-| `userId` | `userId` | `errorUserId` |
-| `entrypoint` | `entrypoint` | `errorEntrypoint` |
-| `componentVersion` | `componentVersion` | `errorComponentVersion` |
 | `callStack` | `callStack` | `errorCallStack` |
-
-**`RequestInfo`** — sum type for request context, attached via `errorRequestInfo`. Each constructor wraps a protocol-specific record:
-
-| Constructor | Wrapped record |
-| --- | --- |
-| `HTTPRequest` | `HTTPRequestInfo` |
-
-**`HTTPRequestInfo`** — fields for HTTP requests:
-
-| Field | Purpose |
-| --- | --- |
-| `requestId` | Unique request identifier for cross-service correlation |
-| `requestMethod` | HTTP method of the request (e.g. `"GET"`, `"POST"`) |
-| `requestIp` | Client IP address (IPv4 or IPv6) |
-| `requestLength` | Request body size in bytes |
-| `requestHeaders` | HTTP headers as `[(Text, Text)]` name-value pairs; empty list is omitted |
-| `requestBody` | Request body as `RequestContent` |
-
-**`RequestContent`** — the request body, as either a structured JSON value or raw text:
-
-| Constructor | Purpose |
-| --- | --- |
-| `JsonBody Value` | JSON payload — log aggregators can index the fields directly |
-| `TextBody Text` | Non-JSON payload (plain text, form-encoded, etc.) stored as raw text |
 
 ### Error Severity
 
