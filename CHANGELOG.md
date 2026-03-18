@@ -16,4 +16,5 @@
 * `CaughtException` data type for wrapping runtime exceptions as Railway errors, with fields `caughtCode`, `caughtEx`, and `caughtCallStack`. The code defaults to `"UNCAUGHT_EXCEPTION"` and can be customized when constructing manually.
 * `tryRail` (with `HasCallStack`) for lifting IO actions that may throw into the Railway, converting any exception to a `CaughtException` error with `Critical` severity and an automatic call stack.
 * `tryRailWithCode` (with `HasCallStack`) — like `tryRail` but accepts a custom error code as the first argument, enabling partial application for domain-specific helpers.
+* `throwCaughtEx` (with `HasCallStack`) — convenience function for throwing a `CaughtException` directly, without manually constructing `SomeError` and `CaughtException`. Captures the call stack automatically at the call site.
 * `runRailT` — the general form of `runRail` for custom base monads. Use when `RailT` is stacked on top of `StateT`, `ReaderT`, or any other transformer.
