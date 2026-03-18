@@ -24,8 +24,8 @@ data TestError = TestErrorA | TestErrorB
   deriving (Show, Eq)
 
 instance HasErrorInfo TestError where
-  errorMessage TestErrorA = "Error A occurred"
-  errorMessage TestErrorB = "Error B occurred"
+  errorPublicMessage TestErrorA = "Error A occurred"
+  errorPublicMessage TestErrorB = "Error B occurred"
   errorCode TestErrorA = "TestErrorA"
   errorCode TestErrorB = "TestErrorB"
   errorDetails TestErrorB = Just (object ["key" .= ("value" :: Text)])
@@ -40,8 +40,8 @@ data SimpleError = NameEmpty | EmailInvalid
   deriving (Show, Data)
 
 instance HasErrorInfo SimpleError where
-  errorMessage NameEmpty    = "Name cannot be empty"
-  errorMessage EmailInvalid = "Email format is invalid"
+  errorPublicMessage NameEmpty    = "Name cannot be empty"
+  errorPublicMessage EmailInvalid = "Email format is invalid"
 
 mkSomeError :: TestError -> SomeError
 mkSomeError = SomeError
@@ -294,9 +294,9 @@ spec = do
           `shouldSatisfy` contains "\"body\""
 
   describe "HasErrorInfo simple implementation" $ do
-    it "errorMessage returns the configured message for each constructor" $ do
-      errorMessage NameEmpty    `shouldBe` ("Name cannot be empty" :: Text)
-      errorMessage EmailInvalid `shouldBe` ("Email format is invalid" :: Text)
+    it "errorPublicMessage returns the configured message for each constructor" $ do
+      errorPublicMessage NameEmpty    `shouldBe` ("Name cannot be empty" :: Text)
+      errorPublicMessage EmailInvalid `shouldBe` ("Email format is invalid" :: Text)
     it "errorCode defaults to the constructor name via Data" $ do
       errorCode NameEmpty    `shouldBe` ("NameEmpty" :: Text)
       errorCode EmailInvalid `shouldBe` ("EmailInvalid" :: Text)
@@ -306,7 +306,7 @@ spec = do
       code (publicErrorInfo NameEmpty) `shouldBe` "NameEmpty"
     it "assembles code from each constructor independently" $
       code (publicErrorInfo EmailInvalid) `shouldBe` "EmailInvalid"
-    it "assembles publicMessage from errorMessage" $
+    it "assembles publicMessage from errorPublicMessage" $
       publicMessage (publicErrorInfo NameEmpty) `shouldBe` "Name cannot be empty"
     it "sets details to Nothing by default" $
       details (publicErrorInfo NameEmpty) `shouldBe` Nothing

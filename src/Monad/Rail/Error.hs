@@ -16,7 +16,7 @@
 --
 -- === Simple errors
 --
--- Implement 'HasErrorInfo' with just 'errorMessage'. Derive 'Data.Data.Data' to get an
+-- Implement 'HasErrorInfo' with just 'errorPublicMessage'. Derive 'Data.Data.Data' to get an
 -- automatic error 'errorCode' derived from the constructor name:
 --
 -- >>> {-# LANGUAGE DeriveDataTypeable #-}
@@ -25,8 +25,8 @@
 -- >>>   deriving (Show, Data)
 -- >>>
 -- >>> instance HasErrorInfo UserError where
--- >>>   errorMessage NameEmpty    = "Name cannot be empty"
--- >>>   errorMessage EmailInvalid = "Email format is invalid"
+-- >>>   errorPublicMessage NameEmpty    = "Name cannot be empty"
+-- >>>   errorPublicMessage EmailInvalid = "Email format is invalid"
 --
 -- Note: the error code is derived directly from the constructor name, so renaming
 -- a constructor silently changes its code. Treat constructor names as part of your
@@ -38,8 +38,8 @@
 -- as many or as few as you need — all non-required methods have sensible defaults:
 --
 -- >>> instance HasErrorInfo UserError where
--- >>>   errorMessage NameEmpty    = "Name cannot be empty"
--- >>>   errorMessage EmailInvalid = "Email format is invalid"
+-- >>>   errorPublicMessage NameEmpty    = "Name cannot be empty"
+-- >>>   errorPublicMessage EmailInvalid = "Email format is invalid"
 -- >>>
 -- >>>   errorCode NameEmpty    = "UserNameEmpty"
 -- >>>   errorCode EmailInvalid = "UserEmailInvalid"
@@ -313,16 +313,16 @@ instance ToJSON InternalErrorInfo where
 
 -- | A type class for converting custom error types into serializable error information.
 --
--- Implement 'errorMessage' — the only required method — to integrate any error type
+-- Implement 'errorPublicMessage' — the only required method — to integrate any error type
 -- with the Railway error system. All other methods have defaults and can be overridden
 -- individually as needed.
 --
 -- Use 'publicErrorInfo' and 'internalErrorInfo' to assemble the corresponding records
 -- from an instance.
 --
--- == Simple errors: implement 'errorMessage' only
+-- == Simple errors: implement 'errorPublicMessage' only
 --
--- Derive 'Data.Data.Data' and implement 'errorMessage'. The 'errorCode' default derives
+-- Derive 'Data.Data.Data' and implement 'errorPublicMessage'. The 'errorCode' default derives
 -- the error code from the constructor name via 'Data.Data.toConstr':
 --
 -- >>> {-# LANGUAGE DeriveDataTypeable #-}
@@ -331,8 +331,8 @@ instance ToJSON InternalErrorInfo where
 -- >>>   deriving (Show, Data)
 -- >>>
 -- >>> instance HasErrorInfo UserError where
--- >>>   errorMessage NameEmpty    = "Name cannot be empty"
--- >>>   errorMessage EmailInvalid = "Email format is invalid"
+-- >>>   errorPublicMessage NameEmpty    = "Name cannot be empty"
+-- >>>   errorPublicMessage EmailInvalid = "Email format is invalid"
 -- >>> -- publicErrorInfo NameEmpty
 -- >>> --   = PublicErrorInfo { publicMessage = "Name cannot be empty"
 -- >>> --                     , code          = "NameEmpty"
@@ -344,8 +344,8 @@ instance ToJSON InternalErrorInfo where
 -- Methods you do not override keep their defaults:
 --
 -- >>> instance HasErrorInfo UserError where
--- >>>   errorMessage NameEmpty    = "Name cannot be empty"
--- >>>   errorMessage EmailInvalid = "Email format is invalid"
+-- >>>   errorPublicMessage NameEmpty    = "Name cannot be empty"
+-- >>>   errorPublicMessage EmailInvalid = "Email format is invalid"
 -- >>>
 -- >>>   errorCode NameEmpty    = "UserNameEmpty"
 -- >>>   errorCode EmailInvalid = "UserEmailInvalid"
@@ -360,7 +360,7 @@ instance ToJSON InternalErrorInfo where
 -- may be ambiguous. Qualify 'GHC.Stack.callStack' to avoid ambiguity.
 class HasErrorInfo e where
   -- | A human-readable message safe to display to end users. This is the only required method.
-  errorMessage :: e -> Text
+  errorPublicMessage :: e -> Text
 
   -- | A machine-readable error code. Defaults to the constructor name via 'Data.Data.toConstr'.
   --
@@ -422,7 +422,7 @@ class HasErrorInfo e where
 publicErrorInfo :: (HasErrorInfo e) => e -> PublicErrorInfo
 publicErrorInfo e =
   PublicErrorInfo
-    { publicMessage = errorMessage e,
+    { publicMessage = errorPublicMessage e,
       code = errorCode e,
       details = errorDetails e
     }
@@ -456,7 +456,7 @@ data UncaughtException = UncaughtException
   deriving (Show, Data)
 
 instance HasErrorInfo UncaughtException where
-  errorMessage _ = "An unexpected error occurred"
+  errorPublicMessage _ = "An unexpected error occurred"
 
 -- | Wrapper for caught exceptions that can be used as an error type.
 --
@@ -497,27 +497,27 @@ data CaughtException = CaughtException
     -- Defaults to @\"UncaughtException\"@ when produced by 'Monad.Rail.Types.tryRail'.
     caughtCode :: Text,
     -- | The original exception.
-    caughtEx :: E.SomeException,
+    caughtException :: E.SomeException,
     -- | Optional Haskell call stack at the catch site.
     -- Populated automatically by 'Monad.Rail.Types.tryRail' via 'GHC.Stack.HasCallStack'.
     caughtCallStack :: Maybe CallStack,
     -- | Optional public message override.
     --
-    -- When 'Nothing', falls back to @'errorMessage' 'UncaughtException'@
+    -- When 'Nothing', falls back to @'errorPublicMessage' 'UncaughtException'@
     -- (@\"An unexpected error occurred\"@). Set this via
     -- 'Monad.Rail.Types.tryRailWithError' to surface a domain-specific message.
     caughtMessage :: Maybe Text
   }
 
 instance Show CaughtException where
-  show ce = "Caught exception: " <> E.displayException (caughtEx ce)
+  show ce = "Caught exception: " <> E.displayException (caughtException ce)
 
 instance HasErrorInfo CaughtException where
-  errorMessage ce = fromMaybe (errorMessage UncaughtException) (caughtMessage ce)
+  errorPublicMessage ce = fromMaybe (errorPublicMessage UncaughtException) (caughtMessage ce)
   errorCode ce = caughtCode ce
   errorSeverity _ = Critical
-  errorInternalMessage ce = Just (T.pack (E.displayException (caughtEx ce)))
-  errorException ce = Just (caughtEx ce)
+  errorInternalMessage ce = Just (T.pack (E.displayException (caughtException ce)))
+  errorException ce = Just (caughtException ce)
   errorCallStack ce = caughtCallStack ce
 
 -- | A wrapper type that can hold any application error implementing 'HasErrorInfo'.
@@ -561,7 +561,7 @@ instance Show SomeError where
   show (SomeError e) = show e
 
 instance HasErrorInfo SomeError where
-  errorMessage (SomeError e) = errorMessage e
+  errorPublicMessage (SomeError e) = errorPublicMessage e
   errorCode (SomeError e) = errorCode e
   errorDetails (SomeError e) = errorDetails e
   errorSeverity (SomeError e) = errorSeverity e

@@ -245,7 +245,7 @@ throwCaughtEx errCode ex = throwError (SomeError caught)
     caught =
       CaughtException
         { caughtCode = errCode,
-          caughtEx = ex,
+          caughtException = ex,
           caughtCallStack = Just callStack,
           caughtMessage = Nothing
         }
@@ -304,7 +304,7 @@ tryRailWithCode mkCode action = do
         caught =
           CaughtException
             { caughtCode = mkCode ex,
-              caughtEx = ex,
+              caughtException = ex,
               caughtCallStack = Just callStack,
               caughtMessage = Nothing
             }
@@ -315,7 +315,7 @@ tryRailWithCode mkCode action = do
 -- The error-building function receives the 'Ex.SomeException' that was thrown,
 -- allowing the resulting error value to carry information extracted from the
 -- exception itself. The 'HasErrorInfo' instance then supplies 'errorCode' as the
--- error code and 'errorMessage' as the public message.
+-- error code and 'errorPublicMessage' as the public message.
 --
 -- == Example
 --
@@ -325,8 +325,8 @@ tryRailWithCode mkCode action = do
 -- >>>   deriving (Show, Data)
 -- >>>
 -- >>> instance HasErrorInfo DbError where
--- >>>   errorMessage (QueryFailed _) = "A database query failed"
--- >>>   errorMessage ConnectionLost  = "Lost connection to the database"
+-- >>>   errorPublicMessage (QueryFailed _) = "A database query failed"
+-- >>>   errorPublicMessage ConnectionLost  = "Lost connection to the database"
 -- >>>
 -- >>> safeQuery :: Rail [Row]
 -- >>> safeQuery = tryRailWithError (\_ -> ConnectionLost) runQuery
@@ -348,9 +348,9 @@ tryRailWithError mkErr action = do
         caught =
           CaughtException
             { caughtCode = errorCode err,
-              caughtEx = ex,
+              caughtException = ex,
               caughtCallStack = Just callStack,
-              caughtMessage = Just (errorMessage err)
+              caughtMessage = Just (errorPublicMessage err)
             }
 
 -- | Accumulates errors from two Railway validations.

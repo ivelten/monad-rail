@@ -21,7 +21,7 @@
 --
 -- == Quick Start
 --
--- Implement 'HasErrorInfo' with 'errorMessage' — the only required method.
+-- Implement 'HasErrorInfo' with 'errorPublicMessage' — the only required method.
 -- Derive 'Data.Data.Data' to get an automatic error code from the constructor name:
 --
 -- >>> {-# LANGUAGE DeriveDataTypeable #-}
@@ -30,14 +30,14 @@
 -- >>>   deriving (Show, Data)
 -- >>>
 -- >>> instance HasErrorInfo UserError where
--- >>>   errorMessage NameEmpty    = "Name cannot be empty"
--- >>>   errorMessage EmailInvalid = "Email format is invalid"
+-- >>>   errorPublicMessage NameEmpty    = "Name cannot be empty"
+-- >>>   errorPublicMessage EmailInvalid = "Email format is invalid"
 --
 -- Override individual methods when you need custom codes or 'errorDetails':
 --
 -- >>> instance HasErrorInfo UserError where
--- >>>   errorMessage NameEmpty    = "Name cannot be empty"
--- >>>   errorMessage EmailInvalid = "Email format is invalid"
+-- >>>   errorPublicMessage NameEmpty    = "Name cannot be empty"
+-- >>>   errorPublicMessage EmailInvalid = "Email format is invalid"
 -- >>>
 -- >>>   errorCode NameEmpty    = "UserNameEmpty"
 -- >>>   errorCode EmailInvalid = "UserEmailInvalid"

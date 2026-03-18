@@ -26,13 +26,13 @@ data TryError = QueryFailed | ConnectionLost
   deriving (Show, Data)
 
 instance HasErrorInfo TryError where
-  errorMessage QueryFailed    = "A database query failed"
-  errorMessage ConnectionLost = "Lost connection to the database"
+  errorPublicMessage QueryFailed    = "A database query failed"
+  errorPublicMessage ConnectionLost = "Lost connection to the database"
 
 instance HasErrorInfo TestError where
-  errorMessage ErrA = "Error A"
-  errorMessage ErrB = "Error B"
-  errorMessage ErrC = "Error C"
+  errorPublicMessage ErrA = "Error A"
+  errorPublicMessage ErrB = "Error B"
+  errorPublicMessage ErrC = "Error C"
   errorCode ErrA = "ErrA"
   errorCode ErrB = "ErrB"
   errorCode ErrC = "ErrC"

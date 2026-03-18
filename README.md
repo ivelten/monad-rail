@@ -20,7 +20,7 @@ build-depends:
 
 ### 1. Define your error type
 
-Implement `HasErrorInfo` with `errorMessage` — the only required method. Derive `Data` to get an automatic error code from the constructor name:
+Implement `HasErrorInfo` with `errorPublicMessage` — the only required method. Derive `Data` to get an automatic error code from the constructor name:
 
 ```haskell
 {-# LANGUAGE DeriveDataTypeable #-}
@@ -34,9 +34,9 @@ data UserError
   deriving (Show, Data)
 
 instance HasErrorInfo UserError where
-  errorMessage NameEmpty    = "Name cannot be empty"
-  errorMessage EmailInvalid = "Invalid email format"
-  errorMessage AgeTooLow    = "Must be at least 18 years old"
+  errorPublicMessage NameEmpty    = "Name cannot be empty"
+  errorPublicMessage EmailInvalid = "Invalid email format"
+  errorPublicMessage AgeTooLow    = "Must be at least 18 years old"
 -- NameEmpty    → { message: "Name cannot be empty",           code: "NameEmpty" }
 -- EmailInvalid → { message: "Invalid email format",           code: "EmailInvalid" }
 -- AgeTooLow    → { message: "Must be at least 18 years old",  code: "AgeTooLow" }
@@ -204,7 +204,7 @@ Like `tryRailWithCode`, but derives the error code and public message from a `Ha
 tryRailWithError :: (HasCallStack, HasErrorInfo e) => (SomeException -> e) -> IO a -> Rail a
 ```
 
-The error-building function receives the `SomeException` that was thrown, allowing the resulting error to carry information extracted from the exception itself. `errorCode` is used as the error code and `errorMessage` as the public message.
+The error-building function receives the `SomeException` that was thrown, allowing the resulting error to carry information extracted from the exception itself. `errorCode` is used as the error code and `errorPublicMessage` as the public message.
 
 ```haskell
 {-# LANGUAGE DeriveDataTypeable #-}
@@ -213,8 +213,8 @@ data DbError = QueryFailed Text | ConnectionLost
   deriving (Show, Data)
 
 instance HasErrorInfo DbError where
-  errorMessage (QueryFailed _) = "A database query failed"
-  errorMessage ConnectionLost  = "Lost connection to the database"
+  errorPublicMessage (QueryFailed _) = "A database query failed"
+  errorPublicMessage ConnectionLost  = "Lost connection to the database"
 
 -- Always map to ConnectionLost, ignoring the exception:
 safeQuery :: Rail [Row]
@@ -234,7 +234,7 @@ The error type produced by `tryRail`. It wraps `SomeException` and implements `H
 ```haskell
 data CaughtException = CaughtException
   { caughtCode      :: Text
-  , caughtEx        :: SomeException
+  , caughtException :: SomeException
   , caughtCallStack :: Maybe CallStack
   , caughtMessage   :: Maybe Text
   }
@@ -297,11 +297,11 @@ runAppRail initialState = runStateT . runRailT
 
 ### `HasErrorInfo`
 
-Typeclass connecting your domain error types to the standard error format. Only `errorMessage` is required — all other methods have sensible defaults:
+Typeclass connecting your domain error types to the standard error format. Only `errorPublicMessage` is required — all other methods have sensible defaults:
 
 ```haskell
 class HasErrorInfo e where
-  errorMessage          :: e -> Text                -- Required
+  errorPublicMessage    :: e -> Text                -- Required
   errorCode             :: e -> Text                -- Default: constructor name via Data
   errorDetails          :: e -> Maybe Value         -- Default: Nothing
   errorSeverity         :: e -> ErrorSeverity       -- Default: Error
@@ -322,9 +322,9 @@ publicErrorInfo  :: HasErrorInfo e => e -> PublicErrorInfo
 internalErrorInfo :: HasErrorInfo e => e -> InternalErrorInfo
 ```
 
-#### Simple errors — implement `errorMessage` only
+#### Simple errors — implement `errorPublicMessage` only
 
-Derive `Data` and implement `errorMessage`. The `errorCode` default derives the error code from the constructor name via `Data.toConstr`:
+Derive `Data` and implement `errorPublicMessage`. The `errorCode` default derives the error code from the constructor name via `Data.toConstr`:
 
 ```haskell
 {-# LANGUAGE DeriveDataTypeable #-}
@@ -333,8 +333,8 @@ data OrderError = ItemOutOfStock | PaymentDeclined
   deriving (Show, Data)
 
 instance HasErrorInfo OrderError where
-  errorMessage ItemOutOfStock  = "One or more items are out of stock"
-  errorMessage PaymentDeclined = "Payment was declined"
+  errorPublicMessage ItemOutOfStock  = "One or more items are out of stock"
+  errorPublicMessage PaymentDeclined = "Payment was declined"
 -- errorCode = "ItemOutOfStock" or "PaymentDeclined"
 ```
 
@@ -346,8 +346,8 @@ Override any combination of methods when you need custom codes, `errorDetails`, 
 
 ```haskell
 instance HasErrorInfo OrderError where
-  errorMessage ItemOutOfStock  = "One or more items are out of stock"
-  errorMessage PaymentDeclined = "Payment was declined"
+  errorPublicMessage ItemOutOfStock  = "One or more items are out of stock"
+  errorPublicMessage PaymentDeclined = "Payment was declined"
 
   -- Custom codes
   errorCode ItemOutOfStock  = "OrderItemOutOfStock"
@@ -368,7 +368,7 @@ Error data is split into two records by visibility. Use the `publicErrorInfo` an
 
 | JSON key | Field | `HasErrorInfo` method |
 | --- | --- | --- |
-| `message` | `publicMessage` | `errorMessage` |
+| `message` | `publicMessage` | `errorPublicMessage` |
 | `code` | `code` | `errorCode` |
 | `details` | `details` | `errorDetails` |
 
@@ -417,7 +417,7 @@ Use `Critical` for errors that need immediate attention (e.g., data corruption, 
 data DbError = ConnectionFailed deriving (Show, Data)
 
 instance HasErrorInfo DbError where
-  errorMessage         ConnectionFailed = "Service temporarily unavailable"
+  errorPublicMessage   ConnectionFailed = "Service temporarily unavailable"
   errorCode            ConnectionFailed = "DbConnectionFailed"
   errorSeverity        ConnectionFailed = Critical
   errorInternalMessage ConnectionFailed = Just "Postgres replica at 10.0.0.5:5432 unreachable"
