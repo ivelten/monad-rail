@@ -12,7 +12,7 @@ import Data.Text (Text)
 import qualified GHC.Stack as GHC
 import Monad.Rail.Error
 import Test.Hspec
-import Test.QuickCheck
+import Test.QuickCheck hiding (Failure)
 
 -- ---------------------------------------------------------------------------
 -- Test fixtures
@@ -53,17 +53,17 @@ instance HasErrorInfo TestError where
         callStack = Nothing
       }
 
-mkAppError :: TestError -> ApplicationError
-mkAppError = ApplicationError
+mkSomeError :: TestError -> SomeError
+mkSomeError = SomeError
 
-mkRailError :: TestError -> RailError
-mkRailError e = RailError (mkAppError e NE.:| [])
+mkFailure :: TestError -> Failure
+mkFailure e = Failure (mkSomeError e NE.:| [])
 
--- | Build a RailError containing n copies of TestErrorA.
-mkRailErrorN :: Int -> RailError
-mkRailErrorN n =
-  let errs = replicate (max 1 n) (mkAppError TestErrorA)
-   in RailError (NE.fromList errs)
+-- | Build a Failure containing n copies of TestErrorA.
+mkFailureN :: Int -> Failure
+mkFailureN n =
+  let errs = replicate (max 1 n) (mkSomeError TestErrorA)
+   in Failure (NE.fromList errs)
 
 -- ---------------------------------------------------------------------------
 -- Byte-string helpers (avoid pulling in extra packages)
@@ -212,7 +212,7 @@ spec = do
               `shouldSatisfy` contains "\"exception\""
           Right _ -> expectationFailure "expected exception"
       it "includes 'callStack' as a string when Just" $ do
-        let internal = internalErrorInfo (mkAppError TestErrorA)
+        let internal = internalErrorInfo (mkSomeError TestErrorA)
             withCs = internal {callStack = Just GHC.callStack}
         encode (toJSON withCs) `shouldSatisfy` contains "\"callStack\""
 
@@ -243,52 +243,52 @@ spec = do
       let ce = CaughtException "CODE" (Ex.SomeException (userError "oops")) Nothing
       callStack (internalErrorInfo ce) `shouldSatisfy` isNothing
 
-  describe "ApplicationError" $ do
+  describe "SomeError" $ do
     it "Show delegates to the wrapped error's Show instance" $
-      show (mkAppError TestErrorA) `shouldBe` "TestErrorA"
+      show (mkSomeError TestErrorA) `shouldBe` "TestErrorA"
 
     it "publicErrorInfo extracts correct code" $ do
-      let pub = publicErrorInfo (mkAppError TestErrorA)
+      let pub = publicErrorInfo (mkSomeError TestErrorA)
       code pub `shouldBe` "TEST_ERROR_A"
 
     it "publicErrorInfo extracts correct message" $ do
-      let pub = publicErrorInfo (mkAppError TestErrorA)
+      let pub = publicErrorInfo (mkSomeError TestErrorA)
       message pub `shouldBe` "Error A occurred"
 
     it "internalErrorInfo extracts correct severity" $ do
-      let internal = internalErrorInfo (mkAppError TestErrorA)
+      let internal = internalErrorInfo (mkSomeError TestErrorA)
       severity internal `shouldBe` Error
 
     it "wraps different error types, each with their own info" $ do
-      let pubA = publicErrorInfo (mkAppError TestErrorA)
-          pubB = publicErrorInfo (mkAppError TestErrorB)
+      let pubA = publicErrorInfo (mkSomeError TestErrorA)
+          pubB = publicErrorInfo (mkSomeError TestErrorB)
       code pubA `shouldBe` "TEST_ERROR_A"
       code pubB `shouldBe` "TEST_ERROR_B"
 
     describe "ToJSON" $ do
       it "serializes via publicErrorInfo" $
-        toJSON (mkAppError TestErrorA) `shouldBe` toJSON (publicErrorInfo TestErrorA)
+        toJSON (mkSomeError TestErrorA) `shouldBe` toJSON (publicErrorInfo TestErrorA)
 
-  describe "RailError" $ do
+  describe "Failure" $ do
     describe "Semigroup" $ do
-      it "combining two single-error RailErrors yields two errors" $ do
-        let combined = mkRailError TestErrorA <> mkRailError TestErrorB
-        length (getAppErrors combined) `shouldBe` 2
+      it "combining two single-error Failures yields two errors" $ do
+        let combined = mkFailure TestErrorA <> mkFailure TestErrorB
+        length (getErrors combined) `shouldBe` 2
 
       it "preserves left errors before right errors" $ do
-        let combined = mkRailError TestErrorA <> mkRailError TestErrorB
-            errList = getAppErrors combined
+        let combined = mkFailure TestErrorA <> mkFailure TestErrorB
+            errList = getErrors combined
         show (NE.head errList) `shouldBe` "TestErrorA"
         show (NE.last errList) `shouldBe` "TestErrorB"
 
       it "satisfies associativity (error count)" $
         property $ \(Positive n1) (Positive n2) (Positive n3) ->
-          let ra = mkRailErrorN (n1 `mod` 5 + 1)
-              rb = mkRailErrorN (n2 `mod` 5 + 1)
-              rc = mkRailErrorN (n3 `mod` 5 + 1)
-           in length (getAppErrors ((ra <> rb) <> rc))
-                == length (getAppErrors (ra <> (rb <> rc)))
+          let ra = mkFailureN (n1 `mod` 5 + 1)
+              rb = mkFailureN (n2 `mod` 5 + 1)
+              rc = mkFailureN (n3 `mod` 5 + 1)
+           in length (getErrors ((ra <> rb) <> rc))
+                == length (getErrors (ra <> (rb <> rc)))
 
     describe "ToJSON" $ do
       it "serializes as a JSON array" $
-        encode (mkRailError TestErrorA) `shouldSatisfy` startsWith "["
+        encode (mkFailure TestErrorA) `shouldSatisfy` startsWith "["

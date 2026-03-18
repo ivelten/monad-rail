@@ -25,7 +25,7 @@ instance HasErrorInfo TestError where
   publicErrorInfo ErrC = PublicErrorInfo { message = "Error C", code = "ERR_C", details = Nothing }
 
 throw :: TestError -> Rail ()
-throw e = throwError (ApplicationError e)
+throw e = throwError (SomeError e)
 
 -- ---------------------------------------------------------------------------
 -- Spec
@@ -57,14 +57,14 @@ spec = do
       result <- runRail (throw ErrA)
       case result of
         Right _ -> expectationFailure "expected Left, got Right"
-        Left err -> length (getAppErrors err) `shouldBe` 1
+        Left err -> length (getErrors err) `shouldBe` 1
 
     it "the error carries the correct code" $ do
       result <- runRail (throw ErrA)
       case result of
         Right _ -> expectationFailure "expected Left, got Right"
         Left err ->
-          let pub = publicErrorInfo (NE.head (getAppErrors err))
+          let pub = publicErrorInfo (NE.head (getErrors err))
            in code pub `shouldBe` "ERR_A"
 
     it "short-circuits: code after throwError is not executed" $ do
@@ -89,8 +89,8 @@ spec = do
         case result of
           Right _ -> expectationFailure "expected Left, got Right"
           Left err -> do
-            length (getAppErrors err) `shouldBe` 1
-            (code . publicErrorInfo . NE.head . getAppErrors) err `shouldBe` "ERR_A"
+            length (getErrors err) `shouldBe` 1
+            (code . publicErrorInfo . NE.head . getErrors) err `shouldBe` "ERR_A"
 
     describe "Right <!> Left" $ do
       it "fails with the second error only" $ do
@@ -98,22 +98,22 @@ spec = do
         case result of
           Right _ -> expectationFailure "expected Left, got Right"
           Left err -> do
-            length (getAppErrors err) `shouldBe` 1
-            (code . publicErrorInfo . NE.head . getAppErrors) err `shouldBe` "ERR_B"
+            length (getErrors err) `shouldBe` 1
+            (code . publicErrorInfo . NE.head . getErrors) err `shouldBe` "ERR_B"
 
     describe "Left <!> Left" $ do
       it "accumulates errors from both sides" $ do
         result <- runRail (throw ErrA <!> throw ErrB)
         case result of
           Right _ -> expectationFailure "expected Left, got Right"
-          Left err -> length (getAppErrors err) `shouldBe` 2
+          Left err -> length (getErrors err) `shouldBe` 2
 
       it "preserves left error before right error" $ do
         result <- runRail (throw ErrA <!> throw ErrB)
         case result of
           Right _ -> expectationFailure "expected Left, got Right"
           Left err ->
-            let codes = map (code . publicErrorInfo) (NE.toList (getAppErrors err))
+            let codes = map (code . publicErrorInfo) (NE.toList (getErrors err))
              in codes `shouldBe` ["ERR_A", "ERR_B"]
 
     describe "chaining three validations" $ do
@@ -121,13 +121,13 @@ spec = do
         result <- runRail (throw ErrA <!> throw ErrB <!> throw ErrC)
         case result of
           Right _ -> expectationFailure "expected Left, got Right"
-          Left err -> length (getAppErrors err) `shouldBe` 3
+          Left err -> length (getErrors err) `shouldBe` 3
 
       it "accumulates errors from two failing and one passing" $ do
         result <- runRail (throw ErrA <!> pure () <!> throw ErrC)
         case result of
           Right _ -> expectationFailure "expected Left, got Right"
-          Left err -> length (getAppErrors err) `shouldBe` 2
+          Left err -> length (getErrors err) `shouldBe` 2
 
       it "succeeds when all three pass" $ do
         result <- runRail (pure () <!> pure () <!> pure ())
@@ -172,7 +172,7 @@ spec = do
       case result of
         Right _ -> expectationFailure "expected Left, got Right"
         Left err -> do
-          let errs = getAppErrors err
+          let errs = getErrors err
           length errs `shouldBe` 1
           (code . publicErrorInfo . NE.head) errs `shouldBe` "UNCAUGHT_EXCEPTION"
 
@@ -182,7 +182,7 @@ spec = do
       case result of
         Right _ -> expectationFailure "expected Left, got Right"
         Left err ->
-          (severity . internalErrorInfo . NE.head . getAppErrors) err `shouldBe` Critical
+          (severity . internalErrorInfo . NE.head . getErrors) err `shouldBe` Critical
 
     it "preserves the original exception in the error" $ do
       let boom = Ex.throwIO (userError "original message")
@@ -190,7 +190,7 @@ spec = do
       case result of
         Right _ -> expectationFailure "expected Left, got Right"
         Left err ->
-          let internal = (internalErrorInfo . NE.head . getAppErrors) err
+          let internal = (internalErrorInfo . NE.head . getErrors) err
           in exception internal `shouldSatisfy` maybe False (("original message" `isInfixOf`) . show)
 
     it "short-circuits: code after tryRail failure is not executed" $ do
@@ -207,7 +207,7 @@ spec = do
       result <- runRail (tryRail (boom :: IO ()) <!> throw ErrA)
       case result of
         Right _ -> expectationFailure "expected Left, got Right"
-        Left err -> length (getAppErrors err) `shouldBe` 2
+        Left err -> length (getErrors err) `shouldBe` 2
 
     it "captures a call stack (callStack is Just)" $ do
       let boom = Ex.throwIO (userError "oops")
@@ -215,7 +215,7 @@ spec = do
       case result of
         Right _ -> expectationFailure "expected Left, got Right"
         Left err ->
-          let internal = (internalErrorInfo . NE.head . getAppErrors) err
+          let internal = (internalErrorInfo . NE.head . getErrors) err
            in callStack internal `shouldSatisfy` isJust
 
   describe "tryRailWithCode" $ do
@@ -238,7 +238,7 @@ spec = do
       case result of
         Right _ -> expectationFailure "expected Left, got Right"
         Left err ->
-          (code . publicErrorInfo . NE.head . getAppErrors) err `shouldBe` "MY_CODE"
+          (code . publicErrorInfo . NE.head . getErrors) err `shouldBe` "MY_CODE"
 
     it "the error has Critical severity" $ do
       let boom = Ex.throwIO (userError "oops")
@@ -246,7 +246,7 @@ spec = do
       case result of
         Right _ -> expectationFailure "expected Left, got Right"
         Left err ->
-          (severity . internalErrorInfo . NE.head . getAppErrors) err `shouldBe` Critical
+          (severity . internalErrorInfo . NE.head . getErrors) err `shouldBe` Critical
 
     it "captures a call stack (callStack is Just)" $ do
       let boom = Ex.throwIO (userError "oops")
@@ -254,7 +254,7 @@ spec = do
       case result of
         Right _ -> expectationFailure "expected Left, got Right"
         Left err ->
-          let internal = (internalErrorInfo . NE.head . getAppErrors) err
+          let internal = (internalErrorInfo . NE.head . getErrors) err
            in callStack internal `shouldSatisfy` isJust
 
     it "can be partially applied to create a reusable helper" $ do
@@ -264,4 +264,4 @@ spec = do
       case result of
         Right _ -> expectationFailure "expected Left, got Right"
         Left err ->
-          (code . publicErrorInfo . NE.head . getAppErrors) err `shouldBe` "CUSTOM_CODE"
+          (code . publicErrorInfo . NE.head . getErrors) err `shouldBe` "CUSTOM_CODE"

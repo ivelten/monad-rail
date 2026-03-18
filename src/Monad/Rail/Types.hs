@@ -14,7 +14,7 @@
 --
 -- * 'RailT' - The monad transformer
 -- * 'Rail' - A convenience alias for 'IO' based computations
--- * 'RailError' - The error type containing one or more 'ApplicationError' values
+-- * 'Failure' - The error type containing one or more 'SomeError' values
 --
 -- == Basic Usage
 --
@@ -49,16 +49,16 @@
 --
 -- == Throwing Errors
 --
--- Use 'throwError' to throw an 'ApplicationError':
+-- Use 'throwError' to throw a 'SomeError':
 --
 -- >>> checkName :: Rail ()
 -- >>> checkName = do
--- >>>   when (T.null name) $ throwError (ApplicationError NameEmpty)
+-- >>>   when (T.null name) $ throwError (SomeError NameEmpty)
 -- >>>   pure ()
 --
 -- == Combining Different Error Types
 --
--- The 'ApplicationError' wrapper allows you to combine errors from different sources:
+-- The 'SomeError' wrapper allows you to combine errors from different sources:
 --
 -- >>> data UserError = NameEmpty
 -- >>> data DatabaseError = ConnectionFailed
@@ -68,8 +68,8 @@
 -- >>>
 -- >>> myRailway :: Rail ()
 -- >>> myRailway = do
--- >>>   throwError (ApplicationError NameEmpty)
--- >>>   throwError (ApplicationError ConnectionFailed)
+-- >>>   throwError (SomeError NameEmpty)
+-- >>>   throwError (SomeError ConnectionFailed)
 module Monad.Rail.Types
   ( RailT (..),
     Rail,
@@ -88,14 +88,14 @@ import Control.Monad.IO.Class (MonadIO, liftIO)
 import Data.List.NonEmpty (NonEmpty (..))
 import qualified Data.Text as T
 import GHC.Stack (HasCallStack, callStack)
-import Monad.Rail.Error (ApplicationError (..), CaughtException (..), RailError (..))
+import Monad.Rail.Error (CaughtException (..), Failure (..), SomeError (..))
 
 -- | The Railway-Oriented monad transformer.
 --
 -- 'RailT' wraps 'ExceptT' to provide composable error handling with support for
 -- error accumulation. It is parameterized over:
 --
--- * @e@ - The error type (typically 'RailError')
+-- * @e@ - The error type (typically 'Failure')
 -- * @m@ - The underlying monad (often 'IO')
 -- * @a@ - The type of successful values
 --
@@ -106,7 +106,7 @@ import Monad.Rail.Error (ApplicationError (..), CaughtException (..), RailError 
 --
 -- Create a computation that can fail:
 --
--- >>> computation :: RailT RailError IO String
+-- >>> computation :: RailT Failure IO String
 -- >>> computation = do
 -- >>>   liftIO $ putStrLn "Starting..."
 -- >>>   pure "result"
@@ -125,11 +125,11 @@ newtype RailT e m a = RailT
 
 -- | A convenient type alias for Railway computations in the 'IO' monad.
 --
--- This is the most common way to use 'RailT'. It fixes the error type to 'RailError'
+-- This is the most common way to use 'RailT'. It fixes the error type to 'Failure'
 -- and the base monad to 'IO', providing a simple interface for building IO-based
 -- applications with Railway-Oriented error handling.
 --
--- @Rail a@ is equivalent to @RailT RailError IO a@
+-- @Rail a@ is equivalent to @RailT Failure IO a@
 --
 -- == Example
 --
@@ -138,15 +138,15 @@ newtype RailT e m a = RailT
 -- >>>   validateInput
 -- >>>   processData
 -- >>>   liftIO $ putStrLn "Complete!"
-type Rail a = RailT RailError IO a
+type Rail a = RailT Failure IO a
 
 -- | Runs a 'Rail' computation and returns the result or accumulated errors.
 --
 -- This function executes the railway computation and returns the final result wrapped
 -- in 'Either'. On success, you get @Right value@. On failure, you get @Left errors@
--- containing all accumulated 'ApplicationError' values.
+-- containing all accumulated 'SomeError' values.
 --
--- The returned 'RailError' contains at least one error (guaranteed by 'NonEmpty'),
+-- The returned 'Failure' contains at least one error (guaranteed by 'NonEmpty'),
 -- making it safe to handle errors without null checks.
 --
 -- == Example
@@ -156,23 +156,23 @@ type Rail a = RailT RailError IO a
 -- >>>   Right value -> putStrLn $ "Success: " ++ show value
 -- >>>   Left errors -> do
 -- >>>     putStrLn "Errors occurred:"
--- >>>     mapM_ print (getAppErrors errors)
+-- >>>     mapM_ print (getErrors errors)
 --
 -- == JSON Serialization
 --
--- The 'RailError' type implements 'ToJSON', so you can easily serialize errors:
+-- The 'Failure' type implements 'ToJSON', so you can easily serialize errors:
 --
 -- >>> import Data.Aeson (encode)
 -- >>> result <- runRail myComputation
 -- >>> case result of
 -- >>>   Left errors -> putStrLn $ BS.unpack $ encode errors
 -- >>>   Right _ -> pure ()
-runRail :: Rail a -> IO (Either RailError a)
+runRail :: Rail a -> IO (Either Failure a)
 runRail = runExceptT . unRailT
 
 -- | Throws an application error in the Railway.
 --
--- This function wraps a single 'ApplicationError' in a 'RailError' container,
+-- This function wraps a single 'SomeError' in a 'Failure' container,
 -- immediately failing the computation with that error. Subsequent operations in the
 -- do-block will not be executed.
 --
@@ -184,20 +184,20 @@ runRail = runExceptT . unRailT
 --
 -- >>> checkAge :: Int -> Rail ()
 -- >>> checkAge age = do
--- >>>   when (age < 0) $ throwError (ApplicationError AgeNegative)
+-- >>>   when (age < 0) $ throwError (SomeError AgeNegative)
 -- >>>   pure ()
 --
 -- == Error Accumulation
 --
--- When multiple errors occur (e.g., with '<!>'), 'RailError' will contain all of them.
+-- When multiple errors occur (e.g., with '<!>'), 'Failure' will contain all of them.
 -- You can then handle them together or individually:
 --
 -- >>> result <- runRail (checkName <!> checkEmail)
 -- >>> case result of
--- >>>   Left errors -> mapM_ print (getAppErrors errors)
+-- >>>   Left errors -> mapM_ print (getErrors errors)
 -- >>>   Right () -> putStrLn "All valid!"
-throwError :: (Monad m) => ApplicationError -> RailT RailError m a
-throwError err = RailT $ E.throwError $ RailError (err :| [])
+throwError :: (Monad m) => SomeError -> RailT Failure m a
+throwError err = RailT $ E.throwError $ Failure (err :| [])
 
 -- | Safely execute an IO action that may throw exceptions,
 -- converting any exception into a Railway error.
@@ -242,7 +242,7 @@ tryRailWithCode code action = do
   result <- liftIO $ Ex.try action
   case result of
     Right value -> pure value
-    Left ex -> throwError (ApplicationError caught)
+    Left ex -> throwError (SomeError caught)
       where
         caught = CaughtException
           { caughtCode      = code,
@@ -297,7 +297,7 @@ tryRailWithCode code action = do
 -- * Configuration validation (validate all settings, report all problems)
 -- * Data pipeline validation (check all constraints, fail with all violations)
 -- * Any scenario where you want "fail-fast" with "report-all-errors"
-(<!>) :: (Monad m) => RailT RailError m () -> RailT RailError m () -> RailT RailError m ()
+(<!>) :: (Monad m) => RailT Failure m () -> RailT Failure m () -> RailT Failure m ()
 v1 <!> v2 = RailT $ ExceptT $ do
   r1 <- runExceptT (unRailT v1)
   r2 <- runExceptT (unRailT v2)

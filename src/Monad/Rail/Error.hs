@@ -19,9 +19,9 @@
 -- >>>   publicErrorInfo NameEmpty   = PublicErrorInfo "Name cannot be empty" "USER_NAME_EMPTY" Nothing
 -- >>>   publicErrorInfo EmailInvalid = PublicErrorInfo "Email is invalid" "USER_EMAIL_INVALID" Nothing
 --
--- 2. Wrap it in 'ApplicationError' to use in your Railway:
+-- 2. Wrap it in 'SomeError' to use in your Railway:
 --
--- >>> throwError (ApplicationError NameEmpty)
+-- >>> throwError (SomeError NameEmpty)
 --
 -- 3. Run your Railway and handle the result:
 --
@@ -34,9 +34,9 @@ module Monad.Rail.Error
     PublicErrorInfo (..),
     InternalErrorInfo (..),
     HasErrorInfo (..),
-    ApplicationError (..),
+    SomeError (..),
     CaughtException (..),
-    RailError (..),
+    Failure (..),
   )
 where
 
@@ -133,7 +133,7 @@ instance ToJSON PublicErrorInfo where
 -- >>>
 -- >>> checkAge :: HasCallStack => Int -> Rail ()
 -- >>> checkAge age
--- >>>   | age < 0 = throwError (ApplicationError AgeTooNegative)
+-- >>>   | age < 0 = throwError (SomeError AgeTooNegative)
 -- >>>   | otherwise = pure ()
 -- >>>
 -- >>> instance HasErrorInfo AgeError where
@@ -266,7 +266,7 @@ class HasErrorInfo e where
 -- >>>   result <- liftIO $ E.try runQuery
 -- >>>   case result of
 -- >>>     Right row -> pure row
--- >>>     Left ex   -> throwError (ApplicationError (CaughtException "DB_QUERY_FAILED" ex Nothing))
+-- >>>     Left ex   -> throwError (SomeError (CaughtException "DB_QUERY_FAILED" ex Nothing))
 --
 -- When using 'tryRail', the code defaults to @\"UNCAUGHT_EXCEPTION\"@ and the
 -- 'callStack' is captured automatically at the call site.
@@ -321,24 +321,24 @@ instance HasErrorInfo CaughtException where
 -- >>>
 -- >>> validate :: Rail ()
 -- >>> validate = do
--- >>>   throwError (ApplicationError NameEmpty)      -- User error
--- >>>   throwError (ApplicationError ConnectionFailed)  -- Database error
-data ApplicationError
+-- >>>   throwError (SomeError NameEmpty)      -- User error
+-- >>>   throwError (SomeError ConnectionFailed)  -- Database error
+data SomeError
   = forall e.
     (HasErrorInfo e, Show e) =>
-    ApplicationError e
+    SomeError e
 
-instance ToJSON ApplicationError where
-  toJSON (ApplicationError e) = toJSON (publicErrorInfo e)
+instance ToJSON SomeError where
+  toJSON (SomeError e) = toJSON (publicErrorInfo e)
 
-instance Show ApplicationError where
-  show (ApplicationError e) = show e
+instance Show SomeError where
+  show (SomeError e) = show e
 
-instance HasErrorInfo ApplicationError where
-  publicErrorInfo (ApplicationError e) = publicErrorInfo e
-  internalErrorInfo (ApplicationError e) = internalErrorInfo e
+instance HasErrorInfo SomeError where
+  publicErrorInfo (SomeError e) = publicErrorInfo e
+  internalErrorInfo (SomeError e) = internalErrorInfo e
 
--- | Represents a collection of one or more application errors.
+-- | Represents a collection of one or more application errors accumulated during a Railway computation.
 --
 -- This type is used as the error type in 'RailT' computations. It guarantees that
 -- at least one error is always present (using 'NonEmpty'), which is essential for
@@ -349,22 +349,22 @@ instance HasErrorInfo ApplicationError where
 --
 -- == Combining Errors
 --
--- Use the 'Semigroup' instance to combine multiple 'RailError' values:
+-- Use the 'Semigroup' instance to combine multiple 'Failure' values:
 --
--- >>> let err1 = RailError (ApplicationError e1 :| [])
--- >>> let err2 = RailError (ApplicationError e2 :| [])
+-- >>> let err1 = Failure (SomeError e1 :| [])
+-- >>> let err2 = Failure (SomeError e2 :| [])
 -- >>> let combined = err1 <> err2  -- Contains both errors
-newtype RailError = RailError
-  { -- | Extracts the non-empty list of application errors.
+newtype Failure = Failure
+  { -- | Extracts the non-empty list of errors.
     --
     -- Use this function to access the individual errors for logging, reporting,
     -- or further processing.
-    getAppErrors :: NonEmpty ApplicationError
+    getErrors :: NonEmpty SomeError
   }
   deriving (Show)
 
-instance Semigroup RailError where
-  (RailError e1) <> (RailError e2) = RailError (e1 <> e2)
+instance Semigroup Failure where
+  (Failure e1) <> (Failure e2) = Failure (e1 <> e2)
 
-instance ToJSON RailError where
-  toJSON = toJSON . getAppErrors
+instance ToJSON Failure where
+  toJSON = toJSON . getErrors

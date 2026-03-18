@@ -4,7 +4,7 @@
 
 * First release.
 * `RailT` monad transformer for Railway-Oriented Programming.
-* `Rail` type alias for `RailT RailError IO`.
+* `Rail` type alias for `RailT Failure IO`.
 * `throwError` for single-error failures.
 * `<!>` operator for parallel validation with error accumulation.
 * `HasErrorInfo` typeclass for custom error types, with two methods:

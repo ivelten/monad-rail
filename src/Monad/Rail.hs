@@ -62,8 +62,8 @@
 -- == Core Concepts
 --
 -- * 'Rail' - The monad for your computations
--- * 'RailError' - Contains accumulated errors
--- * 'ApplicationError' - Wrapper for any error type
+-- * 'Failure' - Contains accumulated errors
+-- * 'SomeError' - Wrapper for any error type
 -- * 'HasErrorInfo' - Typeclass for custom errors
 -- * '<!>' - Error accumulation operator
 --
@@ -78,7 +78,7 @@
 --   Implements 'ToJSON' for structured log output but is never included in public
 --   API responses. Null fields are omitted.
 --
--- The 'RailError' type implements 'ToJSON', so errors serialize automatically:
+-- The 'Failure' type implements 'ToJSON', so errors serialize automatically:
 --
 -- >>> import Data.Aeson (encode)
 -- >>> result <- runRail myRail
@@ -89,7 +89,7 @@ module Monad.Rail
   ( -- * Core Types
     RailT,
     Rail,
-    RailError (..),
+    Failure (..),
 
     -- * Running Railways
     runRail,
@@ -111,7 +111,7 @@ module Monad.Rail
     PublicErrorInfo (..),
     InternalErrorInfo (..),
     HasErrorInfo (..),
-    ApplicationError (..),
+    SomeError (..),
     CaughtException (..),
   )
 where

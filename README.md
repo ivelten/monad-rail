@@ -55,17 +55,17 @@ instance HasErrorInfo UserError where
 ```haskell
 validateName :: String -> Rail ()
 validateName name
-  | null name = throwError (ApplicationError NameEmpty)
+  | null name = throwError (SomeError NameEmpty)
   | otherwise = pure ()
 
 validateEmail :: String -> Rail ()
 validateEmail email
-  | '@' `notElem` email = throwError (ApplicationError EmailInvalid)
+  | '@' `notElem` email = throwError (SomeError EmailInvalid)
   | otherwise = pure ()
 
 validateAge :: Int -> Rail ()
 validateAge age
-  | age < 18  = throwError (ApplicationError AgeTooLow)
+  | age < 18  = throwError (SomeError AgeTooLow)
   | otherwise = pure ()
 ```
 
@@ -111,7 +111,7 @@ Output:
 The main type alias for railway computations:
 
 ```haskell
-type Rail a = RailT RailError IO a
+type Rail a = RailT Failure IO a
 ```
 
 Use `RailT` directly if you need a different base monad.
@@ -121,7 +121,7 @@ Use `RailT` directly if you need a different base monad.
 Moves execution to the failure track with a single error:
 
 ```haskell
-throwError :: ApplicationError -> RailT RailError m a
+throwError :: SomeError -> RailT Failure m a
 ```
 
 All subsequent steps in the `do`-block are skipped.
@@ -147,7 +147,7 @@ Wraps any IO action that may throw exceptions and lifts it into the Railway:
 tryRail :: HasCallStack => IO a -> Rail a
 ```
 
-If the action throws, the exception is caught and converted to an `ApplicationError` wrapping a `CaughtException`. This lets you bring ordinary IO operations into a Railway pipeline without manual exception handling.
+If the action throws, the exception is caught and converted to an `SomeError` wrapping a `CaughtException`. This lets you bring ordinary IO operations into a Railway pipeline without manual exception handling.
 
 ```haskell
 -- File operations
@@ -223,15 +223,15 @@ safeQuery = do
   result <- liftIO $ E.try runQuery
   case result of
     Right row -> pure row
-    Left ex   -> throwError (ApplicationError (CaughtException "DB_QUERY_FAILED" ex Nothing))
+    Left ex   -> throwError (SomeError (CaughtException "DB_QUERY_FAILED" ex Nothing))
 ```
 
 ### `runRail`
 
-Executes the computation and returns `Either RailError a`:
+Executes the computation and returns `Either Failure a`:
 
 ```haskell
-runRail :: Rail a -> IO (Either RailError a)
+runRail :: Rail a -> IO (Either Failure a)
 ```
 
 ### `HasErrorInfo`
@@ -279,7 +279,7 @@ Use `Critical` for errors that need immediate attention (e.g., data corruption, 
 
 ## Combining Errors from Different Sources
 
-`ApplicationError` is an existential wrapper, so you can mix error types freely:
+`SomeError` is an existential wrapper, so you can mix error types freely:
 
 ```haskell
 data DbError = ConnectionFailed deriving (Show)
@@ -305,7 +305,7 @@ pipeline = do
 
 ## JSON Serialization
 
-`RailError` implements `ToJSON` via `aeson`. A failed computation serializes as a JSON array of error objects, using only the `PublicErrorInfo` fields:
+`Failure` implements `ToJSON` via `aeson`. A failed computation serializes as a JSON array of error objects, using only the `PublicErrorInfo` fields:
 
 ```haskell
 import Data.Aeson (encode)
