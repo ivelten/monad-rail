@@ -297,9 +297,27 @@ Error data is split into two records by visibility:
 | `severity` | `Error` or `Critical`, for monitoring |
 | `internalMessage` | Sensitive details for logs (stack traces, DB info) |
 | `exception` | Underlying exception, for debugging only |
-| `requestInfo` | Request-specific tracing data (request ID, user ID, etc.) |
+| `requestInfo` | Structured `RequestInfo` with request ID, headers, and body |
 | `component` | Subsystem label (`"auth"`, `"payment"`) for log filtering |
+| `userId` | Identifier of the user making the request |
+| `entrypoint` | API endpoint or handler that was called (e.g. `"POST /api/v1/users"`) |
+| `componentVersion` | Version of the component running when the error occurred |
 | `callStack` | Haskell call chain at the throw site (requires `HasCallStack`) |
+
+**`RequestInfo`** — structured context about the HTTP request that triggered the error, attached via `requestInfo`:
+
+| Field | Purpose |
+| --- | --- |
+| `requestId` | Unique request identifier for cross-service correlation |
+| `requestHeaders` | HTTP headers as `[(Text, Text)]` name-value pairs; empty list is omitted |
+| `requestBody` | Request body as `RequestContent` |
+
+**`RequestContent`** — the request body, as either a structured JSON value or raw text:
+
+| Constructor | Purpose |
+| --- | --- |
+| `JsonBody Value` | JSON payload — log aggregators can index the fields directly |
+| `TextBody Text` | Non-JSON payload (plain text, form-encoded, etc.) stored as raw text |
 
 ### Error Severity
 

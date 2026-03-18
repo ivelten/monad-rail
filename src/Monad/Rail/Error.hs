@@ -32,6 +32,8 @@
 module Monad.Rail.Error
   ( ErrorSeverity (..),
     PublicErrorInfo (..),
+    RequestContent (..),
+    RequestInfo (..),
     InternalErrorInfo (..),
     HasErrorInfo (..),
     SomeError (..),
@@ -117,6 +119,74 @@ instance ToJSON PublicErrorInfo where
           ("details" .=) <$> details pub
         ]
 
+-- | The body content of an HTTP request, used in 'RequestInfo'.
+--
+-- Most logging solutions index JSON natively, so 'JsonBody' preserves the
+-- structure of JSON payloads for richer querying. Non-JSON payloads are
+-- captured as plain text via 'TextBody'.
+data RequestContent
+  = -- | A structured JSON request body.
+    JsonBody Value
+  | -- | A non-JSON request body stored as plain text.
+    -- Use this for plain text, form-encoded data, or any other content type.
+    TextBody Text
+  deriving (Show)
+
+instance ToJSON RequestContent where
+  toJSON (JsonBody v) = object ["type" .= ("json" :: Text), "body" .= v]
+  toJSON (TextBody t) = object ["type" .= ("text" :: Text), "body" .= t]
+
+-- | Structured context about the HTTP request that triggered an error.
+--
+-- Attach a 'RequestInfo' to 'InternalErrorInfo' to give log aggregators
+-- first-class access to request identifiers, headers, and body without
+-- having to parse opaque blobs. All fields are optional so you can populate
+-- only what is available at the call site.
+--
+-- Empty header lists are omitted from JSON serialization.
+--
+-- Example:
+--
+-- >>> RequestInfo
+-- >>>   { requestId      = Just "req_abc123"
+-- >>>   , requestHeaders = [("Content-Type", "application/json"), ("X-Request-Id", "req_abc123")]
+-- >>>   , requestBody    = Just (JsonBody (object ["name" .= ("Alice" :: Text)]))
+-- >>>   }
+data RequestInfo = RequestInfo
+  { -- | An optional unique identifier for the request.
+    --
+    -- Useful for correlating errors with a specific request across services
+    -- and log entries.
+    --
+    -- Example: @Just \"req_abc123\"@
+    requestId :: Maybe Text,
+    -- | HTTP headers as name-value pairs.
+    --
+    -- Preserves order and repeated headers (e.g. multiple @Set-Cookie@ entries).
+    -- Serialized as a JSON array of @{\"name\": ..., \"value\": ...}@ objects.
+    -- An empty list is omitted from the JSON output.
+    --
+    -- Example: @[(\"Content-Type\", \"application\/json\"), (\"Accept\", \"*\/*\")]@
+    requestHeaders :: [(Text, Text)],
+    -- | The body of the request, if any.
+    --
+    -- Use 'JsonBody' for JSON payloads so log aggregators can index the fields
+    -- directly. Use 'TextBody' for everything else.
+    requestBody :: Maybe RequestContent
+  }
+  deriving (Show)
+
+instance ToJSON RequestInfo where
+  toJSON ri =
+    object $
+      catMaybes
+        [ ("requestId" .=) <$> requestId ri,
+          case requestHeaders ri of
+            [] -> Nothing
+            hs -> Just ("headers" .= [object ["name" .= n, "value" .= v] | (n, v) <- hs]),
+          ("body" .=) <$> requestBody ri
+        ]
+
 -- | Contains internal diagnostic information about an application error.
 --
 -- This record implements 'ToJSON' so it can be serialized for server-side logging
@@ -162,19 +232,42 @@ data InternalErrorInfo = InternalErrorInfo
     -- the error, such as a database connection timeout or file I\/O error.
     -- It is intended for logging and debugging purposes only.
     exception :: Maybe E.SomeException,
-    -- | Optional request-specific context for tracing and diagnostics.
+    -- | Optional structured context about the request that triggered the error.
     --
-    -- This field can hold any JSON-serializable data relevant to the request
-    -- that triggered the error, such as request IDs, user IDs, or other
-    -- tracing information. It is intended for internal observability only.
+    -- Captures the request identifier, headers, and body for tracing and
+    -- diagnostics. It is intended for internal observability only and is never
+    -- included in API responses.
     --
-    -- Example: @Just (object [\"requestId\" .= (\"req_abc\" :: Text)])@
-    requestInfo :: Maybe Value,
+    -- See 'RequestInfo' and 'RequestContent' for the available fields.
+    --
+    -- Example: @Just (RequestInfo { requestId = Just \"req_abc\", requestHeaders = [], requestBody = Nothing })@
+    requestInfo :: Maybe RequestInfo,
     -- | The name of the application component or subsystem that produced this error.
     --
     -- Useful for filtering errors by origin in log aggregators without having to
     -- parse the error 'code'. For example: @\"auth\"@, @\"payment\"@, @\"user-service\"@.
     component :: Maybe Text,
+    -- | An optional identifier for the user making the request.
+    --
+    -- Useful for correlating errors with specific users in log aggregators.
+    -- Should not contain sensitive PII beyond what is appropriate for server-side logs.
+    --
+    -- Example: @Just \"usr_abc123\"@
+    userId :: Maybe Text,
+    -- | The entry point of the request that triggered the error.
+    --
+    -- Typically the API endpoint or handler that was called. Useful for grouping
+    -- errors by origin in observability tooling.
+    --
+    -- Example: @Just \"POST \/api\/v1\/users\"@
+    entrypoint :: Maybe Text,
+    -- | The version of the system component running when the error occurred.
+    --
+    -- Useful for correlating errors with specific releases in log aggregators
+    -- and for diagnosing regressions introduced by a particular deployment.
+    --
+    -- Example: @Just \"1.4.2\"@
+    componentVersion :: Maybe Text,
     -- | The Haskell call stack at the point the error was constructed.
     --
     -- Populate this field by adding a 'GHC.Stack.HasCallStack' constraint to the
@@ -191,10 +284,13 @@ instance ToJSON InternalErrorInfo where
     object $
       catMaybes
         [ Just ("severity" .= severity internal),
-          ("internalMessage" .=) <$> internalMessage internal,
+          ("message" .=) <$> internalMessage internal,
           ("exception" .=) . T.pack . E.displayException <$> exception internal,
           ("requestInfo" .=) <$> requestInfo internal,
           ("component" .=) <$> component internal,
+          ("userId" .=) <$> userId internal,
+          ("entrypoint" .=) <$> entrypoint internal,
+          ("componentVersion" .=) <$> componentVersion internal,
           ("callStack" .=) . T.pack . prettyCallStack <$> callStack internal
         ]
 
@@ -244,6 +340,9 @@ class HasErrorInfo e where
         exception = Nothing,
         requestInfo = Nothing,
         component = Nothing,
+        userId = Nothing,
+        entrypoint = Nothing,
+        componentVersion = Nothing,
         callStack = Nothing
       }
 
@@ -308,6 +407,9 @@ instance HasErrorInfo CaughtException where
         exception = Just (caughtEx ce),
         requestInfo = Nothing,
         component = Nothing,
+        userId = Nothing,
+        entrypoint = Nothing,
+        componentVersion = Nothing,
         callStack = caughtCallStack ce
       }
 

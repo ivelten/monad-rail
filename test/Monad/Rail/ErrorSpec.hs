@@ -2,12 +2,12 @@
 
 module Monad.Rail.ErrorSpec (spec) where
 
-import qualified Data.ByteString.Lazy.Char8 as BSLC
-import Data.Aeson (Value (..), encode, object, toJSON, (.=))
 import qualified Control.Exception as Ex
+import Data.Aeson (Value (..), encode, object, toJSON, (.=))
+import qualified Data.ByteString.Lazy.Char8 as BSLC
 import Data.List (isInfixOf)
-import Data.Maybe (isNothing)
 import qualified Data.List.NonEmpty as NE
+import Data.Maybe (isNothing)
 import Data.Text (Text)
 import qualified GHC.Stack as GHC
 import Monad.Rail.Error
@@ -41,6 +41,9 @@ instance HasErrorInfo TestError where
         exception = Nothing,
         requestInfo = Nothing,
         component = Nothing,
+        userId = Nothing,
+        entrypoint = Nothing,
+        componentVersion = Nothing,
         callStack = Nothing
       }
   internalErrorInfo TestErrorB =
@@ -50,6 +53,9 @@ instance HasErrorInfo TestError where
         exception = Nothing,
         requestInfo = Nothing,
         component = Nothing,
+        userId = Nothing,
+        entrypoint = Nothing,
+        componentVersion = Nothing,
         callStack = Nothing
       }
 
@@ -154,8 +160,6 @@ spec = do
         encode (toJSON pubWithDetails) `shouldSatisfy` contains "\"details\""
 
     describe "ToJSON — sensitive fields are absent" $ do
-      it "does NOT include 'internalMessage'" $
-        encoded `shouldSatisfy` notContains "internalMessage"
       it "does NOT include 'severity'" $
         encoded `shouldSatisfy` notContains "severity"
       it "does NOT include 'exception'" $
@@ -164,6 +168,12 @@ spec = do
         encoded `shouldSatisfy` notContains "requestInfo"
       it "does NOT include 'component'" $
         encoded `shouldSatisfy` notContains "component"
+      it "does NOT include 'userId'" $
+        encoded `shouldSatisfy` notContains "userId"
+      it "does NOT include 'entrypoint'" $
+        encoded `shouldSatisfy` notContains "entrypoint"
+      it "does NOT include 'componentVersion'" $
+        encoded `shouldSatisfy` notContains "componentVersion"
       it "does NOT include 'callStack'" $
         encoded `shouldSatisfy` notContains "callStack"
 
@@ -175,6 +185,9 @@ spec = do
               exception = Nothing,
               requestInfo = Nothing,
               component = Nothing,
+              userId = Nothing,
+              entrypoint = Nothing,
+              componentVersion = Nothing,
               callStack = Nothing
             }
 
@@ -183,27 +196,51 @@ spec = do
         encode (toJSON base) `shouldSatisfy` contains "\"severity\""
 
     describe "ToJSON — null fields are omitted" $ do
-      it "omits 'internalMessage' when Nothing" $
-        encode (toJSON base) `shouldSatisfy` notContains "internalMessage"
+      it "omits 'message' when Nothing" $
+        encode (toJSON base) `shouldSatisfy` notContains "message"
       it "omits 'exception' when Nothing" $
         encode (toJSON base) `shouldSatisfy` notContains "exception"
       it "omits 'requestInfo' when Nothing" $
         encode (toJSON base) `shouldSatisfy` notContains "requestInfo"
       it "omits 'component' when Nothing" $
         encode (toJSON base) `shouldSatisfy` notContains "component"
+      it "omits 'userId' when Nothing" $
+        encode (toJSON base) `shouldSatisfy` notContains "userId"
+      it "omits 'entrypoint' when Nothing" $
+        encode (toJSON base) `shouldSatisfy` notContains "entrypoint"
+      it "omits 'componentVersion' when Nothing" $
+        encode (toJSON base) `shouldSatisfy` notContains "componentVersion"
       it "omits 'callStack' when Nothing" $
         encode (toJSON base) `shouldSatisfy` notContains "callStack"
 
     describe "ToJSON — non-null optional fields are included" $ do
-      it "includes 'internalMessage' when Just" $
+      it "includes 'message' when Just" $
         encode (toJSON base {internalMessage = Just "debug info"})
-          `shouldSatisfy` contains "\"internalMessage\""
+          `shouldSatisfy` contains "\"message\""
       it "includes 'component' when Just" $
         encode (toJSON base {component = Just "auth"})
           `shouldSatisfy` contains "\"component\""
       it "includes the component value" $
         encode (toJSON base {component = Just "auth"})
           `shouldSatisfy` contains "auth"
+      it "includes 'userId' when Just" $
+        encode (toJSON base {userId = Just "usr_abc123"})
+          `shouldSatisfy` contains "\"userId\""
+      it "includes the userId value" $
+        encode (toJSON base {userId = Just "usr_abc123"})
+          `shouldSatisfy` contains "usr_abc123"
+      it "includes 'entrypoint' when Just" $
+        encode (toJSON base {entrypoint = Just "POST /api/v1/users"})
+          `shouldSatisfy` contains "\"entrypoint\""
+      it "includes the entrypoint value" $
+        encode (toJSON base {entrypoint = Just "POST /api/v1/users"})
+          `shouldSatisfy` contains "POST /api/v1/users"
+      it "includes 'componentVersion' when Just" $
+        encode (toJSON base {componentVersion = Just "1.4.2"})
+          `shouldSatisfy` contains "\"componentVersion\""
+      it "includes the componentVersion value" $
+        encode (toJSON base {componentVersion = Just "1.4.2"})
+          `shouldSatisfy` contains "1.4.2"
       it "includes 'exception' as a string when Just" $ do
         ex <- Ex.try (Ex.evaluate (error "boom")) :: IO (Either Ex.SomeException ())
         case ex of
@@ -211,10 +248,66 @@ spec = do
             encode (toJSON base {exception = Just e})
               `shouldSatisfy` contains "\"exception\""
           Right _ -> expectationFailure "expected exception"
+      it "includes 'requestInfo' when Just" $ do
+        let ri = RequestInfo {requestId = Just "req_1", requestHeaders = [], requestBody = Nothing}
+        encode (toJSON base {requestInfo = Just ri})
+          `shouldSatisfy` contains "\"requestInfo\""
       it "includes 'callStack' as a string when Just" $ do
         let internal = internalErrorInfo (mkSomeError TestErrorA)
             withCs = internal {callStack = Just GHC.callStack}
         encode (toJSON withCs) `shouldSatisfy` contains "\"callStack\""
+
+  describe "RequestContent" $ do
+    describe "ToJSON — JsonBody" $ do
+      it "serializes with type 'json'" $
+        encode (toJSON (JsonBody (object ["x" .= (1 :: Int)])))
+          `shouldSatisfy` contains "\"json\""
+      it "serializes with a 'body' field" $
+        encode (toJSON (JsonBody (object ["x" .= (1 :: Int)])))
+          `shouldSatisfy` contains "\"body\""
+      it "preserves the JSON structure in body" $
+        encode (toJSON (JsonBody (object ["x" .= (1 :: Int)])))
+          `shouldSatisfy` contains "\"x\""
+
+    describe "ToJSON — TextBody" $ do
+      it "serializes with type 'text'" $
+        encode (toJSON (TextBody "hello"))
+          `shouldSatisfy` contains "\"text\""
+      it "serializes with a 'body' field" $
+        encode (toJSON (TextBody "hello"))
+          `shouldSatisfy` contains "\"body\""
+      it "preserves the text value in body" $
+        encode (toJSON (TextBody "hello"))
+          `shouldSatisfy` contains "hello"
+
+  describe "RequestInfo" $ do
+    let emptyRi = RequestInfo {requestId = Nothing, requestHeaders = [], requestBody = Nothing}
+
+    describe "ToJSON — null/empty fields are omitted" $ do
+      it "omits 'requestId' when Nothing" $
+        encode (toJSON emptyRi) `shouldSatisfy` notContains "requestId"
+      it "omits 'headers' when list is empty" $
+        encode (toJSON emptyRi) `shouldSatisfy` notContains "headers"
+      it "omits 'body' when Nothing" $
+        encode (toJSON emptyRi) `shouldSatisfy` notContains "body"
+
+    describe "ToJSON — non-empty fields are included" $ do
+      it "includes 'requestId' when Just" $
+        encode (toJSON emptyRi {requestId = Just "req_abc"})
+          `shouldSatisfy` contains "\"requestId\""
+      it "includes the requestId value" $
+        encode (toJSON emptyRi {requestId = Just "req_abc"})
+          `shouldSatisfy` contains "req_abc"
+      it "includes 'headers' when non-empty" $
+        encode (toJSON emptyRi {requestHeaders = [("Content-Type", "application/json")]})
+          `shouldSatisfy` contains "\"headers\""
+      it "includes header name and value" $ do
+        let encoded = encode (toJSON emptyRi {requestHeaders = [("Content-Type", "application/json")]})
+        encoded `shouldSatisfy` contains "Content-Type"
+        encoded `shouldSatisfy` contains "application/json"
+      it "includes 'body' when Just" $
+        encode (toJSON emptyRi {requestBody = Just (TextBody "data")})
+          `shouldSatisfy` contains "\"body\""
 
   describe "CaughtException" $ do
     it "Show includes the exception message" $ do
@@ -236,8 +329,8 @@ spec = do
     it "internalErrorInfo.exception holds the original exception" $ do
       let originalEx = Ex.SomeException (userError "original")
           ce = CaughtException "CODE" originalEx Nothing
-      exception (internalErrorInfo ce) `shouldSatisfy`
-        maybe False (("original" `isInfixOf`) . show)
+      exception (internalErrorInfo ce)
+        `shouldSatisfy` maybe False (("original" `isInfixOf`) . show)
 
     it "internalErrorInfo.callStack is Nothing when caughtCallStack is Nothing" $ do
       let ce = CaughtException "CODE" (Ex.SomeException (userError "oops")) Nothing
