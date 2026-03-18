@@ -234,6 +234,27 @@ Executes the computation and returns `Either Failure a`:
 runRail :: Rail a -> IO (Either Failure a)
 ```
 
+### `runRailT`
+
+The general form of `runRail`, for when your base monad is not `IO`:
+
+```haskell
+runRailT :: Monad m => RailT e m a -> m (Either e a)
+```
+
+Use it when `RailT` is stacked on top of another transformer, such as `StateT` or `ReaderT`:
+
+```haskell
+import Control.Monad.State (StateT, runStateT)
+
+data AppState = AppState { counter :: Int }
+
+type AppRail a = RailT Failure (StateT AppState IO) a
+
+runAppRail :: AppState -> AppRail a -> IO (Either Failure a, AppState)
+runAppRail initialState = runStateT . runRailT
+```
+
 ### `HasErrorInfo`
 
 Typeclass connecting your domain error types to the standard error format:

@@ -73,6 +73,7 @@
 module Monad.Rail.Types
   ( RailT (..),
     Rail,
+    runRailT,
     runRail,
     throwError,
     tryRail,
@@ -81,9 +82,9 @@ module Monad.Rail.Types
   )
 where
 
+import qualified Control.Exception as Ex
 import Control.Monad.Except (ExceptT (..), runExceptT)
 import qualified Control.Monad.Except as E
-import qualified Control.Exception as Ex
 import Control.Monad.IO.Class (MonadIO, liftIO)
 import Data.List.NonEmpty (NonEmpty (..))
 import qualified Data.Text as T
@@ -139,6 +140,23 @@ newtype RailT e m a = RailT
 -- >>>   processData
 -- >>>   liftIO $ putStrLn "Complete!"
 type Rail a = RailT Failure IO a
+
+-- | Runs a 'RailT' computation in any base monad @m@, returning @m (Either e a)@.
+--
+-- This is the general form of 'runRail'. Use it when your base monad is not 'IO' —
+-- for example, when 'RailT' is stacked on top of 'StateT', 'ReaderT', or any other
+-- transformer.
+--
+-- == Example: custom monad stack
+--
+-- >>> import Control.Monad.State (StateT, runStateT)
+-- >>>
+-- >>> type AppRail a = RailT Failure (StateT AppState IO) a
+-- >>>
+-- >>> runAppRail :: AppState -> AppRail a -> IO (Either Failure a, AppState)
+-- >>> runAppRail initialState = runStateT . runRailT
+runRailT :: (Monad m) => RailT e m a -> m (Either e a)
+runRailT = runExceptT . unRailT
 
 -- | Runs a 'Rail' computation and returns the result or accumulated errors.
 --
@@ -216,7 +234,7 @@ throwError err = RailT $ E.throwError $ Failure (err :| [])
 -- >>>   content <- tryRail (readFile filePath)
 -- >>>   validateName content <!> validateEmail content
 -- >>>   saveToDb content
-tryRail :: HasCallStack => IO a -> Rail a
+tryRail :: (HasCallStack) => IO a -> Rail a
 tryRail = tryRailWithCode (T.pack "UNCAUGHT_EXCEPTION")
 
 -- | Like 'tryRail', but with a custom error code.
@@ -237,18 +255,19 @@ tryRail = tryRailWithCode (T.pack "UNCAUGHT_EXCEPTION")
 -- Note: if you partially apply this function, add 'HasCallStack' to the
 -- wrapper's own signature so the call stack is captured at each call site
 -- rather than frozen at the definition of the wrapper.
-tryRailWithCode :: HasCallStack => T.Text -> IO a -> Rail a
+tryRailWithCode :: (HasCallStack) => T.Text -> IO a -> Rail a
 tryRailWithCode code action = do
   result <- liftIO $ Ex.try action
   case result of
     Right value -> pure value
     Left ex -> throwError (SomeError caught)
       where
-        caught = CaughtException
-          { caughtCode      = code,
-            caughtEx        = ex,
-            caughtCallStack = Just callStack
-          }
+        caught =
+          CaughtException
+            { caughtCode = code,
+              caughtEx = ex,
+              caughtCallStack = Just callStack
+            }
 
 -- | Accumulates errors from two Railway validations.
 --

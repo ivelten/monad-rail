@@ -3,6 +3,7 @@
 module Monad.Rail.TypesSpec (spec) where
 
 import Control.Monad.IO.Class (liftIO)
+import Control.Monad.State (StateT, runStateT)
 import qualified Control.Exception as Ex
 import Data.IORef (newIORef, readIORef, modifyIORef)
 import Data.List (isInfixOf)
@@ -33,6 +34,30 @@ throw e = throwError (SomeError e)
 
 spec :: Spec
 spec = do
+  describe "runRailT" $ do
+    it "returns Right for a successful computation with a custom base monad" $ do
+      let comp :: RailT Failure (StateT Int IO) String
+          comp = pure "hello"
+      (result, _) <- runStateT (runRailT comp) 0
+      case result of
+        Left _    -> expectationFailure "expected Right, got Left"
+        Right val -> val `shouldBe` "hello"
+
+    it "returns Left for a failing computation with a custom base monad" $ do
+      let comp :: RailT Failure (StateT Int IO) ()
+          comp = throwError (SomeError ErrA)
+      (result, _) <- runStateT (runRailT comp) 0
+      case result of
+        Right _ -> expectationFailure "expected Left, got Right"
+        Left err -> length (getErrors err) `shouldBe` 1
+
+    it "is equivalent to runRail when the base monad is IO" $ do
+      viaRailT <- runRailT (pure (42 :: Int) :: Rail Int)
+      viaRail   <- runRail  (pure (42 :: Int) :: Rail Int)
+      case (viaRailT, viaRail) of
+        (Right a, Right b) -> a `shouldBe` b
+        _                  -> expectationFailure "both should be Right"
+
   describe "runRail" $ do
     it "returns Right for a successful computation" $ do
       result <- runRail (pure "hello")

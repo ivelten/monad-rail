@@ -87,11 +87,12 @@
 -- >>>   Right _ -> pure ()
 module Monad.Rail
   ( -- * Core Types
-    RailT,
+    RailT (..),
     Rail,
     Failure (..),
 
     -- * Running Railways
+    runRailT,
     runRail,
 
     -- * Throwing Errors
