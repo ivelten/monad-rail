@@ -269,6 +269,15 @@ class HasErrorInfo e where
 -- >>>     Right row -> pure row
 -- >>>     Left ex   -> throwError (SomeError (CaughtException "DB_QUERY_FAILED" ex Nothing))
 --
+-- Or use 'throwCaughtEx' for a more concise form that also captures the call stack automatically:
+--
+-- >>> safeQuery :: Rail Row
+-- >>> safeQuery = do
+-- >>>   result <- liftIO $ E.try runQuery
+-- >>>   case result of
+-- >>>     Right row -> pure row
+-- >>>     Left ex   -> throwCaughtEx "DB_QUERY_FAILED" ex
+--
 -- When using 'tryRail', the code defaults to @\"UNCAUGHT_EXCEPTION\"@ and the
 -- 'callStack' is captured automatically at the call site.
 data CaughtException = CaughtException

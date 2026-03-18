@@ -290,3 +290,54 @@ spec = do
         Right _ -> expectationFailure "expected Left, got Right"
         Left err ->
           (code . publicErrorInfo . NE.head . getErrors) err `shouldBe` "CUSTOM_CODE"
+
+  describe "throwCaughtEx" $ do
+    it "returns Left with a single error" $ do
+      let ex = Ex.SomeException (userError "oops")
+      result <- runRail (throwCaughtEx "MY_CODE" ex :: Rail ())
+      case result of
+        Right _ -> expectationFailure "expected Left, got Right"
+        Left err -> length (getErrors err) `shouldBe` 1
+
+    it "uses the provided code in the error" $ do
+      let ex = Ex.SomeException (userError "oops")
+      result <- runRail (throwCaughtEx "MY_CODE" ex :: Rail ())
+      case result of
+        Right _ -> expectationFailure "expected Left, got Right"
+        Left err ->
+          (code . publicErrorInfo . NE.head . getErrors) err `shouldBe` "MY_CODE"
+
+    it "the error has Critical severity" $ do
+      let ex = Ex.SomeException (userError "oops")
+      result <- runRail (throwCaughtEx "MY_CODE" ex :: Rail ())
+      case result of
+        Right _ -> expectationFailure "expected Left, got Right"
+        Left err ->
+          (severity . internalErrorInfo . NE.head . getErrors) err `shouldBe` Critical
+
+    it "preserves the original exception in the error" $ do
+      let ex = Ex.SomeException (userError "original message")
+      result <- runRail (throwCaughtEx "MY_CODE" ex :: Rail ())
+      case result of
+        Right _ -> expectationFailure "expected Left, got Right"
+        Left err ->
+          let internal = (internalErrorInfo . NE.head . getErrors) err
+          in exception internal `shouldSatisfy` maybe False (("original message" `isInfixOf`) . show)
+
+    it "captures a call stack (callStack is Just)" $ do
+      let ex = Ex.SomeException (userError "oops")
+      result <- runRail (throwCaughtEx "MY_CODE" ex :: Rail ())
+      case result of
+        Right _ -> expectationFailure "expected Left, got Right"
+        Left err ->
+          let internal = (internalErrorInfo . NE.head . getErrors) err
+           in callStack internal `shouldSatisfy` isJust
+
+    it "short-circuits: code after throwCaughtEx is not executed" $ do
+      ref <- newIORef (0 :: Int)
+      let ex = Ex.SomeException (userError "fail")
+      _ <- runRail $ do
+        _ <- throwCaughtEx "MY_CODE" ex
+        liftIO $ modifyIORef ref (+ 1)
+      val <- readIORef ref
+      val `shouldBe` 0

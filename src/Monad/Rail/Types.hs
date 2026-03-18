@@ -76,6 +76,7 @@ module Monad.Rail.Types
     runRailT,
     runRail,
     throwError,
+    throwCaughtEx,
     tryRail,
     tryRailWithCode,
     (<!>),
@@ -216,6 +217,36 @@ runRail = runExceptT . unRailT
 -- >>>   Right () -> putStrLn "All valid!"
 throwError :: (Monad m) => SomeError -> RailT Failure m a
 throwError err = RailT $ E.throwError $ Failure (err :| [])
+
+-- | Throw a caught IO exception as a Railway error with a domain-specific code.
+--
+-- This is a convenience wrapper around 'throwError' for the common pattern of
+-- catching an IO exception and re-throwing it as a 'CaughtException'. It
+-- captures the call stack automatically, so you do not need to pass it manually.
+--
+-- The call stack is captured at the __call site__ of 'throwCaughtEx', not at the
+-- definition of any wrapper around it (provided the wrapper also carries
+-- 'HasCallStack').
+--
+-- == Example
+--
+-- >>> import qualified Control.Exception as E
+-- >>>
+-- >>> safeQuery :: Rail Row
+-- >>> safeQuery = do
+-- >>>   result <- liftIO $ E.try runQuery
+-- >>>   case result of
+-- >>>     Right row -> pure row
+-- >>>     Left ex   -> throwCaughtEx "DB_QUERY_FAILED" ex
+throwCaughtEx :: (HasCallStack, Monad m) => T.Text -> Ex.SomeException -> RailT Failure m a
+throwCaughtEx code ex = throwError (SomeError caught)
+  where
+    caught =
+      CaughtException
+        { caughtCode = code,
+          caughtEx = ex,
+          caughtCallStack = Just callStack
+        }
 
 -- | Safely execute an IO action that may throw exceptions,
 -- converting any exception into a Railway error.
