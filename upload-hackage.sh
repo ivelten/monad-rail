@@ -89,7 +89,7 @@ fi
 
 echo ""
 echo "📖 Building Haddock documentation..."
-cabal haddock --for-hackage --enable-documentation
+cabal haddock --haddock-for-hackage --enable-documentation
 
 DOCS="dist-newstyle/monad-rail-${VERSION}-docs.tar.gz"
 
