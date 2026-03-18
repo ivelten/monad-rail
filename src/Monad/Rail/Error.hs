@@ -183,6 +183,9 @@ instance ToJSON RequestContent where
 --
 -- >>> RequestInfo
 -- >>>   { requestId      = Just "req_abc123"
+-- >>>   , requestMethod  = Just "POST"
+-- >>>   , requestIp      = Just "203.0.113.42"
+-- >>>   , requestLength  = Just 128
 -- >>>   , requestHeaders = [("Content-Type", "application/json"), ("X-Request-Id", "req_abc123")]
 -- >>>   , requestBody    = Just (JsonBody (object ["name" .= ("Alice" :: Text)]))
 -- >>>   }
@@ -194,6 +197,26 @@ data RequestInfo = RequestInfo
     --
     -- Example: @Just \"req_abc123\"@
     requestId :: Maybe Text,
+    -- | The HTTP method of the request.
+    --
+    -- Useful for filtering errors by method in log aggregators.
+    --
+    -- Example: @Just \"POST\"@
+    requestMethod :: Maybe Text,
+    -- | The client IP address of the request.
+    --
+    -- Supports both IPv4 and IPv6 addresses. Useful for correlating errors
+    -- with specific clients and for abuse detection.
+    --
+    -- Example: @Just \"203.0.113.42\"@
+    requestIp :: Maybe Text,
+    -- | The size of the request body in bytes.
+    --
+    -- Typically derived from the @Content-Length@ header or measured after
+    -- reading the body. Useful for diagnosing payload-related errors.
+    --
+    -- Example: @Just 1024@
+    requestLength :: Maybe Int,
     -- | HTTP headers as name-value pairs.
     --
     -- Preserves order and repeated headers (e.g. multiple @Set-Cookie@ entries).
@@ -215,6 +238,9 @@ instance ToJSON RequestInfo where
     object $
       catMaybes
         [ ("requestId" .=) <$> requestId ri,
+          ("method" .=) <$> requestMethod ri,
+          ("ip" .=) <$> requestIp ri,
+          ("length" .=) <$> requestLength ri,
           case requestHeaders ri of
             [] -> Nothing
             hs -> Just ("headers" .= [object ["name" .= n, "value" .= v] | (n, v) <- hs]),

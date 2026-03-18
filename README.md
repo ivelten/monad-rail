@@ -391,6 +391,9 @@ Error data is split into two records by visibility. Use the `publicErrorInfo` an
 | Field | Purpose |
 | --- | --- |
 | `requestId` | Unique request identifier for cross-service correlation |
+| `requestMethod` | HTTP method of the request (e.g. `"GET"`, `"POST"`) |
+| `requestIp` | Client IP address (IPv4 or IPv6) |
+| `requestLength` | Request body size in bytes |
 | `requestHeaders` | HTTP headers as `[(Text, Text)]` name-value pairs; empty list is omitted |
 | `requestBody` | Request body as `RequestContent` |
 

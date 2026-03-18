@@ -233,7 +233,7 @@ spec = do
               `shouldSatisfy` contains "\"exception\""
           Right _ -> expectationFailure "expected exception"
       it "includes 'requestInfo' when Just" $ do
-        let ri = RequestInfo {requestId = Just "req_1", requestHeaders = [], requestBody = Nothing}
+        let ri = RequestInfo {requestId = Just "req_1", requestMethod = Nothing, requestIp = Nothing, requestLength = Nothing, requestHeaders = [], requestBody = Nothing}
         encode (toJSON base {requestInfo = Just ri})
           `shouldSatisfy` contains "\"requestInfo\""
       it "includes 'callStack' as a string when Just" $ do
@@ -265,11 +265,17 @@ spec = do
           `shouldSatisfy` contains "hello"
 
   describe "RequestInfo" $ do
-    let emptyRi = RequestInfo {requestId = Nothing, requestHeaders = [], requestBody = Nothing}
+    let emptyRi = RequestInfo {requestId = Nothing, requestMethod = Nothing, requestIp = Nothing, requestLength = Nothing, requestHeaders = [], requestBody = Nothing}
 
     describe "ToJSON — null/empty fields are omitted" $ do
       it "omits 'requestId' when Nothing" $
         encode (toJSON emptyRi) `shouldSatisfy` notContains "requestId"
+      it "omits 'method' when Nothing" $
+        encode (toJSON emptyRi) `shouldSatisfy` notContains "method"
+      it "omits 'ip' when Nothing" $
+        encode (toJSON emptyRi) `shouldSatisfy` notContains "ip"
+      it "omits 'length' when Nothing" $
+        encode (toJSON emptyRi) `shouldSatisfy` notContains "length"
       it "omits 'headers' when list is empty" $
         encode (toJSON emptyRi) `shouldSatisfy` notContains "headers"
       it "omits 'body' when Nothing" $
@@ -282,6 +288,24 @@ spec = do
       it "includes the requestId value" $
         encode (toJSON emptyRi {requestId = Just "req_abc"})
           `shouldSatisfy` contains "req_abc"
+      it "includes 'method' when Just" $
+        encode (toJSON emptyRi {requestMethod = Just "POST"})
+          `shouldSatisfy` contains "\"method\""
+      it "includes the method value" $
+        encode (toJSON emptyRi {requestMethod = Just "POST"})
+          `shouldSatisfy` contains "POST"
+      it "includes 'ip' when Just" $
+        encode (toJSON emptyRi {requestIp = Just "203.0.113.42"})
+          `shouldSatisfy` contains "\"ip\""
+      it "includes the ip value" $
+        encode (toJSON emptyRi {requestIp = Just "203.0.113.42"})
+          `shouldSatisfy` contains "203.0.113.42"
+      it "includes 'length' when Just" $
+        encode (toJSON emptyRi {requestLength = Just 1024})
+          `shouldSatisfy` contains "\"length\""
+      it "includes the length value" $
+        encode (toJSON emptyRi {requestLength = Just 1024})
+          `shouldSatisfy` contains "1024"
       it "includes 'headers' when non-empty" $
         encode (toJSON emptyRi {requestHeaders = [("Content-Type", "application/json")]})
           `shouldSatisfy` contains "\"headers\""
