@@ -158,20 +158,23 @@ pipeline filePath = do
 
 ### `tryRailWithCode`
 
-Like `tryRail`, but lets you specify a domain-specific error code:
+Like `tryRail`, but lets you derive a domain-specific error code from the caught exception:
 
 ```haskell
-tryRailWithCode :: HasCallStack => Text -> IO a -> Rail a
+tryRailWithCode :: HasCallStack => (SomeException -> Text) -> IO a -> Rail a
 ```
 
-Because the code is the first argument, you can partially apply it to create reusable, domain-specific helpers:
+Pass a constant function when the code is fixed, or inspect the exception to return different codes:
 
 ```haskell
 tryDb :: HasCallStack => IO a -> Rail a
-tryDb = tryRailWithCode "DbError"
+tryDb = tryRailWithCode (const "DbError")
 
 tryHttp :: HasCallStack => IO a -> Rail a
-tryHttp = tryRailWithCode "HttpError"
+tryHttp = tryRailWithCode $ \ex ->
+  if "timeout" `T.isInfixOf` T.pack (displayException ex)
+    then "HttpTimeout"
+    else "HttpError"
 
 pipeline :: Rail ()
 pipeline = do

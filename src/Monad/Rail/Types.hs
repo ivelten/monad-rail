@@ -269,29 +269,33 @@ throwCaughtEx errCode ex = throwError (SomeError caught)
 -- >>>   validateName content <!> validateEmail content
 -- >>>   saveToDb content
 tryRail :: (HasCallStack) => IO a -> Rail a
-tryRail = tryRailWithCode (errorCode UncaughtException)
+tryRail = tryRailWithCode (const (errorCode UncaughtException))
 
--- | Like 'tryRail', but with a custom error code.
+-- | Like 'tryRail', but with a custom error code derived from the exception.
 --
 -- Wraps an IO action that may throw, converting any exception into a Railway
--- error with the given code. The public message remains the generic default
+-- error whose code is produced by applying the given function to the caught
+-- exception. The public message remains the generic default
 -- (@\"An unexpected error occurred\"@). Use 'tryRailWithError' when you also
 -- need a domain-specific public message.
 --
--- Because the code is the first argument, the function can be partially applied
--- to create reusable, domain-specific try helpers:
+-- Pass a constant function (@'const' \"MyCode\"@) when the code is fixed, or
+-- inspect the exception to return different codes:
 --
 -- >>> tryDb :: HasCallStack => IO a -> Rail a
--- >>> tryDb = tryRailWithCode "DbError"
+-- >>> tryDb = tryRailWithCode (const "DbError")
 -- >>>
 -- >>> tryHttp :: HasCallStack => IO a -> Rail a
--- >>> tryHttp = tryRailWithCode "HttpError"
+-- >>> tryHttp = tryRailWithCode $ \ex ->
+-- >>>   if "timeout" `T.isInfixOf` T.pack (Ex.displayException ex)
+-- >>>     then "HttpTimeout"
+-- >>>     else "HttpError"
 --
 -- Note: if you partially apply this function, add 'GHC.Stack.HasCallStack' to the
 -- wrapper's own signature so the call stack is captured at each call site
 -- rather than frozen at the definition of the wrapper.
-tryRailWithCode :: (HasCallStack) => T.Text -> IO a -> Rail a
-tryRailWithCode errCode action = do
+tryRailWithCode :: (HasCallStack) => (Ex.SomeException -> T.Text) -> IO a -> Rail a
+tryRailWithCode mkCode action = do
   result <- liftIO $ Ex.try action
   case result of
     Right value -> pure value
@@ -299,7 +303,7 @@ tryRailWithCode errCode action = do
       where
         caught =
           CaughtException
-            { caughtCode = errCode,
+            { caughtCode = mkCode ex,
               caughtEx = ex,
               caughtCallStack = Just callStack,
               caughtMessage = Nothing

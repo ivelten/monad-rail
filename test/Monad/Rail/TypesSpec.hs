@@ -257,21 +257,21 @@ spec = do
 
   describe "tryRailWithCode" $ do
     it "returns Right when the IO action succeeds" $ do
-      result <- runRail (tryRailWithCode "MY_CODE" (pure (42 :: Int)))
+      result <- runRail (tryRailWithCode (const "MY_CODE") (pure (42 :: Int)))
       case result of
         Left _    -> expectationFailure "expected Right, got Left"
         Right val -> val `shouldBe` 42
 
     it "returns Left when the IO action throws" $ do
       let boom = Ex.throwIO (userError "oops")
-      result <- runRail (tryRailWithCode "MY_CODE" boom :: Rail ())
+      result <- runRail (tryRailWithCode (const "MY_CODE") boom :: Rail ())
       case result of
         Right _ -> expectationFailure "expected Left, got Right"
         Left _  -> pure ()
 
     it "uses the provided code in the error" $ do
       let boom = Ex.throwIO (userError "oops")
-      result <- runRail (tryRailWithCode "MY_CODE" boom :: Rail ())
+      result <- runRail (tryRailWithCode (const "MY_CODE") boom :: Rail ())
       case result of
         Right _ -> expectationFailure "expected Left, got Right"
         Left err ->
@@ -279,7 +279,7 @@ spec = do
 
     it "the error has Critical severity" $ do
       let boom = Ex.throwIO (userError "oops")
-      result <- runRail (tryRailWithCode "MY_CODE" boom :: Rail ())
+      result <- runRail (tryRailWithCode (const "MY_CODE") boom :: Rail ())
       case result of
         Right _ -> expectationFailure "expected Left, got Right"
         Left err ->
@@ -287,7 +287,7 @@ spec = do
 
     it "captures a call stack (callStack is Just)" $ do
       let boom = Ex.throwIO (userError "oops")
-      result <- runRail (tryRailWithCode "MY_CODE" boom :: Rail ())
+      result <- runRail (tryRailWithCode (const "MY_CODE") boom :: Rail ())
       case result of
         Right _ -> expectationFailure "expected Left, got Right"
         Left err ->
@@ -296,7 +296,7 @@ spec = do
 
     it "uses the generic public message regardless of code" $ do
       let boom = Ex.throwIO (userError "internal detail")
-      result <- runRail (tryRailWithCode "MY_CODE" boom :: Rail ())
+      result <- runRail (tryRailWithCode (const "MY_CODE") boom :: Rail ())
       case result of
         Right _ -> expectationFailure "expected Left, got Right"
         Left err ->
@@ -304,7 +304,7 @@ spec = do
             `shouldBe` "An unexpected error occurred"
 
     it "can be partially applied to create a reusable helper" $ do
-      let tryCustom = tryRailWithCode "CUSTOM_CODE"
+      let tryCustom = tryRailWithCode (const "CUSTOM_CODE")
           boom      = Ex.throwIO (userError "oops")
       result <- runRail (tryCustom boom :: Rail ())
       case result of

@@ -19,7 +19,7 @@
 * `ErrorSeverity` with `Error` and `Critical` levels.
 * `CaughtException` data type for wrapping runtime exceptions as Railway errors, with fields `caughtCode`, `caughtEx`, `caughtCallStack`, and `caughtMessage`. The code defaults to `"UncaughtException"` and can be customized when constructing manually.
 * `tryRail` (with `HasCallStack`) for lifting IO actions that may throw into the Railway, converting any exception to a `CaughtException` error with `Critical` severity and an automatic call stack.
-* `tryRailWithCode` (with `HasCallStack`) — like `tryRail` but accepts a custom error code as the first argument, enabling partial application for domain-specific helpers.
+* `tryRailWithCode` (with `HasCallStack`) — like `tryRail` but accepts a function `SomeException -> Text` as the first argument, allowing the error code to be derived from the caught exception. Pass `const "MyCode"` for a fixed code, or inspect the exception to return different codes dynamically.
 * `tryRailWithError` (with `HasCallStack`, `HasErrorInfo e`) — like `tryRailWithCode`, but takes an error-building function `SomeException -> e` and uses `errorCode` and `errorMessage` from the resulting `HasErrorInfo` instance as the error code and public message.
 * `throwCaughtEx` (with `HasCallStack`) — convenience function for throwing a `CaughtException` directly, without manually constructing `SomeError` and `CaughtException`. Captures the call stack automatically at the call site.
 * `runRailT` — the general form of `runRail` for custom base monads. Use when `RailT` is stacked on top of `StateT`, `ReaderT`, or any other transformer.
