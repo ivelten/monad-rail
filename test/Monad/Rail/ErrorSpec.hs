@@ -9,8 +9,9 @@ import qualified Data.ByteString.Lazy.Char8 as BSLC
 import Data.Data (Data)
 import Data.List (isInfixOf)
 import qualified Data.List.NonEmpty as NE
-import Data.Maybe (isNothing)
+import Data.Maybe (isJust, isNothing)
 import Data.Text (Text)
+import Data.Typeable (cast)
 import qualified GHC.Stack as GHC
 import Monad.Rail.Error
 import Test.Hspec
@@ -28,7 +29,7 @@ instance HasErrorInfo TestError where
   errorPublicMessage TestErrorB = "Error B occurred"
   errorCode TestErrorA = "TestErrorA"
   errorCode TestErrorB = "TestErrorB"
-  errorDetails TestErrorB = Just (object ["key" .= ("value" :: Text)])
+  errorDetails TestErrorB = Just (ErrorDetails (object ["key" .= ("value" :: Text)]))
   errorDetails _ = Nothing
   errorInternalMessage TestErrorA = Just "Internal details for A"
   errorInternalMessage _ = Nothing
@@ -117,6 +118,60 @@ spec = do
       it "serializes Critical as JSON string \"Critical\"" $
         toJSON Critical `shouldBe` String "Critical"
 
+  describe "ErrorDetails" $ do
+    describe "Show" $ do
+      it "delegates to the wrapped value's Show instance" $
+        show (ErrorDetails ("hello" :: Text)) `shouldBe` show ("hello" :: Text)
+      it "shows numeric values" $
+        show (ErrorDetails (42 :: Int)) `shouldBe` "42"
+
+    describe "ToJSON" $ do
+      it "serializes a Text value" $
+        toJSON (ErrorDetails ("hello" :: Text)) `shouldBe` String "hello"
+      it "serializes a JSON object" $ do
+        let obj = object ["key" .= ("val" :: Text)]
+        toJSON (ErrorDetails obj) `shouldBe` obj
+      it "serializes a numeric value" $
+        toJSON (ErrorDetails (42 :: Int)) `shouldBe` toJSON (42 :: Int)
+
+    describe "Typeable — type recovery via cast" $ do
+      it "recovers the original type when cast matches" $ do
+        let ed = ErrorDetails ("hello" :: Text)
+        case ed of
+          ErrorDetails a -> cast a `shouldBe` Just ("hello" :: Text)
+      it "returns Nothing when cast does not match" $ do
+        let ed = ErrorDetails ("hello" :: Text)
+        case ed of
+          ErrorDetails a -> (cast a :: Maybe Int) `shouldBe` Nothing
+      it "recovers a complex type" $ do
+        let val = [1, 2, 3] :: [Int]
+            ed = ErrorDetails val
+        case ed of
+          ErrorDetails a -> cast a `shouldBe` Just ([1, 2, 3] :: [Int])
+
+    describe "round-trip through PublicErrorInfo" $ do
+      it "details wrapped in ErrorDetails serialize correctly in PublicErrorInfo JSON" $ do
+        let pub = PublicErrorInfo
+              { publicMessage = "err",
+                code = "E1",
+                details = Just (ErrorDetails (object ["id" .= (1 :: Int)]))
+              }
+        encode pub `shouldSatisfy` contains "\"id\":1"
+      it "details Nothing produces no details key in JSON" $ do
+        let pub = PublicErrorInfo
+              { publicMessage = "err",
+                code = "E1",
+                details = Nothing
+              }
+        encode pub `shouldSatisfy` notContains "details"
+      it "details with ErrorDetails is Just" $ do
+        let pub = PublicErrorInfo
+              { publicMessage = "err",
+                code = "E1",
+                details = Just (ErrorDetails ("x" :: Text))
+              }
+        details pub `shouldSatisfy` isJust
+
   describe "PublicErrorInfo" $ do
     let pub =
           PublicErrorInfo
@@ -140,7 +195,7 @@ spec = do
 
     describe "ToJSON — non-null optional fields are included" $ do
       it "includes 'details' when Just" $ do
-        let pubWithDetails = pub {details = Just (object ["resourceId" .= ("usr_1" :: Text)])}
+        let pubWithDetails = pub {details = Just (ErrorDetails (object ["resourceId" .= ("usr_1" :: Text)]))}
         encode (toJSON pubWithDetails) `shouldSatisfy` contains "\"details\""
 
     describe "ToJSON — sensitive fields are absent" $ do
@@ -204,9 +259,9 @@ spec = do
     it "assembles publicMessage from errorPublicMessage" $
       publicMessage (publicErrorInfo NameEmpty) `shouldBe` "Name cannot be empty"
     it "sets details to Nothing by default" $
-      details (publicErrorInfo NameEmpty) `shouldBe` Nothing
+      details (publicErrorInfo NameEmpty) `shouldSatisfy` isNothing
     it "assembles details from errorDetails when Just" $
-      details (publicErrorInfo (mkSomeError TestErrorB)) `shouldBe` Just (object ["key" .= ("value" :: Text)])
+      fmap toJSON (details (publicErrorInfo (mkSomeError TestErrorB))) `shouldBe` Just (object ["key" .= ("value" :: Text)])
 
   describe "internalErrorInfo" $ do
     it "default severity is Error" $
@@ -269,7 +324,7 @@ spec = do
       severity internal `shouldBe` Error
 
     it "publicErrorInfo delegates errorDetails through the existential" $ do
-      details (publicErrorInfo (mkSomeError TestErrorB)) `shouldBe` Just (object ["key" .= ("value" :: Text)])
+      fmap toJSON (details (publicErrorInfo (mkSomeError TestErrorB))) `shouldBe` Just (object ["key" .= ("value" :: Text)])
 
     it "internalErrorInfo delegates errorInternalMessage through the existential" $ do
       internalMessage (internalErrorInfo (mkSomeError TestErrorA)) `shouldBe` Just "Internal details for A"

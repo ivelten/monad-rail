@@ -303,7 +303,7 @@ Typeclass connecting your domain error types to the standard error format. Only 
 class HasErrorInfo e where
   errorPublicMessage   :: e -> Text                -- Required
   errorCode            :: e -> Text                -- Default: constructor name via Data
-  errorDetails         :: e -> Maybe Value         -- Default: Nothing
+  errorDetails         :: e -> Maybe ErrorDetails  -- Default: Nothing
   errorSeverity        :: e -> ErrorSeverity       -- Default: Error
   errorInternalMessage :: e -> Maybe Text          -- Default: Nothing
   errorException       :: e -> Maybe SomeException -- Default: Nothing

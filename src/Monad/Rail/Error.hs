@@ -63,6 +63,7 @@ module Monad.Rail.Error
   ( ErrorSeverity (..),
     PublicErrorInfo (..),
     InternalErrorInfo (..),
+    ErrorDetails (..),
     HasErrorInfo (..),
     publicErrorInfo,
     internalErrorInfo,
@@ -73,12 +74,13 @@ module Monad.Rail.Error
 where
 
 import qualified Control.Exception as E
-import Data.Aeson (ToJSON (..), Value, object, (.=))
+import Data.Aeson (ToJSON (..), object, (.=))
 import Data.Data (Data, toConstr)
 import Data.List.NonEmpty (NonEmpty)
 import Data.Maybe (catMaybes, fromMaybe)
 import Data.Text (Text)
 import qualified Data.Text as T
+import Data.Typeable (Typeable)
 import GHC.Stack (CallStack, prettyCallStack)
 
 -- | Represents the severity level of an application error.
@@ -98,6 +100,26 @@ data ErrorSeverity
 instance ToJSON ErrorSeverity where
   toJSON Error = "Error"
   toJSON Critical = "Critical"
+
+-- | An existential wrapper that can hold any value with 'ToJSON', 'Show', and 'Typeable'
+-- constraints.
+--
+-- This allows 'errorDetails' and 'PublicErrorInfo' to carry structured detail values
+-- of any type, deferring JSON serialization until needed while preserving the ability
+-- to recover the concrete type via 'Data.Typeable.cast'.
+--
+-- Example:
+--
+-- >>> ErrorDetails ("usr_123" :: Text)
+-- >>> ErrorDetails (42 :: Int)
+-- >>> ErrorDetails (object ["field" .= ("email" :: Text)])
+data ErrorDetails = forall a. (ToJSON a, Show a, Typeable a) => ErrorDetails a
+
+instance Show ErrorDetails where
+  show (ErrorDetails a) = show a
+
+instance ToJSON ErrorDetails where
+  toJSON (ErrorDetails a) = toJSON a
 
 -- | Contains the public-facing information about an application error.
 --
@@ -127,17 +149,19 @@ data PublicErrorInfo = PublicErrorInfo
     code :: Text,
     -- | Optional context details associated with the error.
     --
-    -- This field can hold any JSON-serializable data that provides additional
-    -- context about the error that is safe to share with the caller. For example:
+    -- This field can hold any value with 'ToJSON', 'Show', and 'Typeable'
+    -- constraints, providing additional context about the error that is safe
+    -- to share with the caller. For example:
     --
     -- * Affected resource identifiers
     -- * Custom business logic data
     --
-    -- Using 'Value' from @aeson@ allows flexibility: you can store objects,
-    -- arrays, strings, or any JSON value.
+    -- The existential 'ErrorDetails' wrapper preserves the original value type,
+    -- allowing downstream code to recover the concrete type via 'Data.Typeable.cast'
+    -- while still supporting JSON serialization.
     --
-    -- Example: @Just (object [\"resourceId\" .= (\"usr_123\" :: Text)])@
-    details :: Maybe Value
+    -- Example: @Just (ErrorDetails (object [\"resourceId\" .= (\"usr_123\" :: Text)]))@
+    details :: Maybe ErrorDetails
   }
   deriving (Show)
 
@@ -258,8 +282,12 @@ class HasErrorInfo e where
   default errorCode :: (Data e) => e -> Text
   errorCode e = T.pack (show (toConstr e))
 
-  -- | Optional JSON details safe to share with callers. Defaults to 'Nothing'.
-  errorDetails :: e -> Maybe Value
+  -- | Optional details safe to share with callers. Defaults to 'Nothing'.
+  --
+  -- Wrap your value with 'ErrorDetails' to store it:
+  --
+  -- >>> errorDetails MyError = Just (ErrorDetails (object ["field" .= ("email" :: Text)]))
+  errorDetails :: e -> Maybe ErrorDetails
   errorDetails _ = Nothing
 
   -- | Severity level of the error. Defaults to 'Error'.
